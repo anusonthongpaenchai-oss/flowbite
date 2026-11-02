@@ -1,0 +1,105 @@
+<section
+  class="flex min-h-dvh flex-col gap-4 bg-[#EBF5FF] p-4 text-[#111928] max-[540px]:gap-3 max-[540px]:p-3"
+>
+  <!-- header -->
+  <app-navbar></app-navbar>
+
+  <!-- main content -->
+  <main
+    class="flex flex-1 items-center justify-between gap-12 rounded-2xl bg-white p-16 max-[1100px]:justify-center max-[1100px]:px-6 max-[1100px]:py-12 max-[540px]:px-4 max-[540px]:py-8"
+  >
+    <!-- illustration -->
+    <div class="min-w-0 flex-[0_1_467px] max-[1100px]:hidden" aria-hidden="true">
+      <img [src]="illustration" alt="" width="467" height="578" class="block h-auto w-full" />
+    </div>
+
+    <!-- form -->
+    <section
+      class="flex w-full max-w-lg flex-[0_0_512px] flex-col gap-6 rounded-lg bg-white p-6 shadow-sm max-[1100px]:basis-auto max-[540px]:px-4"
+      aria-labelledby="login-title"
+    >
+      <!-- header -->
+      <div class="flex items-center gap-2 text-lg font-semibold">
+        <img [src]="logo" alt="" width="24" height="24" />
+        <span>Flowbite</span>
+      </div>
+
+      <!-- title -->
+      <div>
+        <h1 id="login-title" class="text-2xl font-bold">Welcome back</h1>
+        <p class="text-sm text-gray-500">
+          Don’t have an account? <app-button variant="ghost">Sign up</app-button>
+        </p>
+      </div>
+
+      <!-- form -->
+      <form
+        [formGroup]="loginForm"
+        (ngSubmit)="handleSubmit()"
+        [attr.aria-busy]="isSubmitting()"
+        class="flex flex-col gap-6"
+        novalidate
+      >
+        <!-- social login -->
+        <div class="flex flex-col gap-4">
+          <app-button variant="secondary" [icon]="googleIcon">Sign up with Google</app-button>
+          <app-button variant="secondary" [icon]="facebookIcon">Sign up with Facebook</app-button>
+        </div>
+
+        <!-- or  -->
+        <div
+          class="flex items-center gap-6 text-base leading-none text-gray-500"
+          aria-hidden="true"
+        >
+          <span class="h-px flex-1 bg-gray-200"></span>
+          <span>or</span>
+          <span class="h-px flex-1 bg-gray-200"></span>
+        </div>
+
+        <!-- input login -->
+        <div class="grid grid-cols-2 gap-4 max-[540px]:grid-cols-1">
+          <app-input
+            label="Email"
+            type="email"
+            [(value)]="email"
+            placeholder="name@example.com"
+          ></app-input>
+
+          <app-input
+            label="Password"
+            type="password"
+            [(value)]="password"
+            placeholder="••••••••••"
+          ></app-input>
+        </div>
+
+        <div
+          class="flex items-center justify-between gap-4 max-[540px]:flex-wrap max-[540px]:gap-3"
+        >
+          <app-checkbox
+            label="Remember me"
+            [(checked)]="rememberMe"
+            [disabled]="isSubmitting()"
+          ></app-checkbox>
+
+          <app-button variant="ghost">Forgot password?</app-button>
+        </div>
+        
+        <!-- handle error -->
+        @if (errorMessage()) {
+          <p role="alert" class="text-sm text-red-600">{{ errorMessage() }}</p>
+        }
+
+        <!-- handle success -->
+        @if (successMessage()) {
+          <p role="status" class="text-sm text-green-700">{{ successMessage() }}</p>
+        }
+
+        <!-- submit button -->
+        <app-button type="submit" variant="primary" class="w-full" [disabled]="isSubmitting()">{{
+          isSubmitting() ? 'Signing in…' : 'Sign in'
+        }}</app-button>
+      </form>
+    </section>
+  </main>
+</section>

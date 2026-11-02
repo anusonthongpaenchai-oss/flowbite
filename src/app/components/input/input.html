@@ -1,0 +1,10 @@
+<label class="flex w-full min-w-0 flex-col gap-2 text-sm font-medium text-gray-900">
+  <span class="text-sm font-medium">{{ label }}</span>
+  <input
+    [type]="type"
+    [value]="value"
+    (input)="onInput($event)"
+    [placeholder]="placeholder"
+    class="w-full min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm leading-5 font-medium text-gray-900 placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+  />
+</label>

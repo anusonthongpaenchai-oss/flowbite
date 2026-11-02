@@ -1,0 +1,11 @@
+<button
+  [type]="type()"
+  [disabled]="disabled()"
+  [class]="buttonClasses()"
+  (click)="onClick.emit()"
+>
+  @if (icon()) {
+    <img [src]="icon()" alt="" aria-hidden="true" class="h-5 w-5 shrink-0 object-contain" />
+  }
+  <ng-content>Button</ng-content>
+</button>
