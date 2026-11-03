@@ -18,7 +18,7 @@ export class Login {
 
   // svg
   readonly logo = 'svg/Logo.svg';
-  readonly illustration = 'svg/Illustration.svg';
+  readonly illustration = 'svg/login/Illustration.svg';
   readonly facebookIcon = 'svg/social/Facebook.svg';
   readonly googleIcon = 'svg/social/Google.svg';
 
