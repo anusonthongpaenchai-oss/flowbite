@@ -3,8 +3,10 @@ import { Button } from '../../components/button/button';
 import { Checkbox } from '../../components/checkbox/checkbox';
 import { InputComponent } from '../../components/input/input';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Navbar } from '../../components/navbar/navbar';
 import { login } from '../../../shared/api/auth/login';
+import { setAuthSession } from '../../../shared/guard/auth';
 
 @Component({
   imports: [Button, Checkbox, InputComponent, ReactiveFormsModule, Navbar],
@@ -13,8 +15,8 @@ import { login } from '../../../shared/api/auth/login';
   templateUrl: './login.html',
 })
 export class Login {
-
   private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
 
   // svg
   readonly logo = 'svg/Logo.svg';
@@ -91,22 +93,18 @@ export class Login {
         return;
       }
 
-      if (!session?.accessToken || !session.refreshToken || !session.member) {
+      if (!session) {
         this.errorMessage.set(response.message || 'Unable to sign in. Please try again.');
         return;
       }
 
-      const storage = rememberMe ? localStorage : sessionStorage;
-      const otherStorage = rememberMe ? sessionStorage : localStorage;
-      storage.setItem('authSession', JSON.stringify(session));
-      otherStorage.removeItem('authSession');
+      setAuthSession(session, rememberMe);
 
       this.password = '';
       this.loginForm.controls.password.markAsUntouched();
       this.successMessage.set(response?.message);
 
-      console.log(`accessToken: ${session.accessToken}`);
-      console.log(`refreshToken: ${session.refreshToken}`);
+      await this.router.navigateByUrl('/user-info');
     } catch (error) {
       this.errorMessage.set(
         error instanceof Error ? error.message : 'Unable to sign in. Please try again.',
