@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import type { AxiosResponse } from 'axios';
 import { api } from '../../../shared/api/api';
 import { Login } from './login';
+import { routes } from '../../app.routes';
 
 describe('Login', () => {
   let component: Login;
@@ -58,6 +60,7 @@ describe('Login', () => {
 
     await TestBed.configureTestingModule({
       imports: [Login],
+      providers: [provideRouter(routes)],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Login);
@@ -69,6 +72,32 @@ describe('Login', () => {
     localStorage.removeItem('authSession');
     sessionStorage.removeItem('authSession');
     vi.restoreAllMocks();
+  });
+
+  it('navigates to signup when the Sign up button is clicked', async () => {
+    const router = TestBed.inject(Router);
+    const signupButton = fixture.nativeElement.querySelector(
+      'app-button[routerLink="/signup"] button',
+    ) as HTMLButtonElement;
+
+    signupButton.click();
+    await fixture.whenStable();
+
+    expect(router.url).toBe('/signup');
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('does not navigate when a button without routerLink is clicked', async () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl');
+    const button = fixture.nativeElement.querySelector(
+      'app-button[variant="secondary"] button',
+    ) as HTMLButtonElement;
+
+    button.click();
+    await fixture.whenStable();
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('marks invalid fields without requesting a login', async () => {
