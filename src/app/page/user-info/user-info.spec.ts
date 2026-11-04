@@ -95,6 +95,24 @@ describe('UserInfo', () => {
   }
 
   beforeEach(async () => {
+    Object.defineProperties(HTMLDialogElement.prototype, {
+      showModal: {
+        configurable: true,
+        value() {
+          this.open = true;
+        },
+      },
+      close: {
+        configurable: true,
+        value() {
+          this.open = false;
+        },
+      },
+    });
+    Object.defineProperties(URL, {
+      createObjectURL: { configurable: true, value: vi.fn(() => 'blob:profile-preview') },
+      revokeObjectURL: { configurable: true, value: vi.fn() },
+    });
     getMock.mockReset();
     getMock.mockResolvedValue(response(profile));
     vi.spyOn(api, 'get').mockImplementation(getMock);
@@ -443,6 +461,58 @@ describe('UserInfo', () => {
     await fixture.whenStable();
     return element;
   }
+
+  it('uploads a chosen profile image, closes the preview, and refreshes the displayed avatar', async () => {
+    const element = render();
+    await fixture.whenStable();
+    expect(element.querySelector('app-chang-image')).toBeNull();
+
+    findButton(element, 'Change image profile').click();
+    await fixture.whenStable();
+
+    const modal = element.querySelector('app-chang-image')!;
+    expect(modal.querySelector('dialog')!.open).toBe(true);
+    const file = new File(['profile image'], 'profile.png', { type: 'image/png' });
+    const input = modal.querySelector('input')!;
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    const newImageUrl = 'https://example.com/profile.png';
+    postMock.mockResolvedValueOnce({ status: 200, data: { result: true } } as AxiosResponse);
+    getMock.mockResolvedValueOnce(
+      response({
+        ...profile,
+        data: { ...profile.data, member: { ...profile.data.member, m_image_url: newImageUrl } },
+      }),
+    );
+
+    findButton(modal as HTMLElement, 'Save').click();
+    await fixture.whenStable();
+
+    const [url, body, config] = postMock.mock.calls[0];
+    expect(url).toBe('/v1/member/profile/image');
+    expect(body).toBeInstanceOf(FormData);
+    expect((body as FormData).get('profileImage')).toBe(file);
+    expect(config?.headers?.['Content-Type']).toBeNull();
+    expect(getMock).toHaveBeenCalledTimes(2);
+    expect(element.querySelector('app-chang-image')).toBeNull();
+    expect(element.querySelector('img.profile-avatar')!.getAttribute('src')).toBe(newImageUrl);
+    expect(component.updateSuccessMessage()).toContain('Profile image updated');
+  });
+
+  it('closes the image preview without uploading when the close button is clicked', async () => {
+    const element = render();
+    await fixture.whenStable();
+    findButton(element, 'Change image profile').click();
+    await fixture.whenStable();
+
+    element.querySelector<HTMLButtonElement>('app-chang-image .close-button button')!.click();
+    await fixture.whenStable();
+
+    expect(component.isChangeImageProfile()).toBe(false);
+    expect(element.querySelector('app-chang-image')).toBeNull();
+    expect(postMock).not.toHaveBeenCalled();
+  });
 
   function findButton(element: HTMLElement, label: string): HTMLButtonElement {
     return [...element.querySelectorAll('button')].find(

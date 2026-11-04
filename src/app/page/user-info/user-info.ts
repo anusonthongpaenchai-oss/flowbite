@@ -1,16 +1,21 @@
 import { Component, computed, inject, OnInit, PendingTasks, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { logout } from '../../../shared/api/auth/logout';
-import { getUserInfo } from '../../../shared/api/userInfo/userInfo';
-import { Button } from '../../components/button/button';
-import { EditProfile } from '../../components/userInfo/edit-profile/edit-profile';
 import {
   normalizeProfileUpdateRequest,
   profileUpdate,
   type ProfileUpdateRequest,
 } from '../../../shared/api/userInfo/profileUpdate';
+
+// components
+import { Button } from '../../components/button/button';
+import { EditProfile } from '../../components/userInfo/edit-profile/edit-profile';
+import { ChangImage } from '../../components/userInfo/chang-image/chang-image';
+
+// api
+import { logout } from '../../../shared/api/auth/logout';
+import { getUserInfo } from '../../../shared/api/userInfo/userInfo';
 @Component({
-  imports: [RouterLink, Button, EditProfile],
+  imports: [RouterLink, Button, EditProfile, ChangImage],
   selector: 'app-user-info',
   styleUrl: './user-info.css',
   templateUrl: './user-info.html',
@@ -78,7 +83,7 @@ export class UserInfo implements OnInit {
     return `${countryCode ? `+${countryCode}` : ''}${formattedNumber}`;
   });
 
-  // social info (mock until these fields are available from the API)
+  // social info (mock)
   public googleLink = signal<boolean>(false);
   public facebookLink = signal<boolean>(true);
   public appleLink = signal<boolean>(false);
@@ -112,6 +117,20 @@ export class UserInfo implements OnInit {
       address_zipcode: this.zipCode(),
     },
   }));
+
+  public openChangeImageProfile(): void {
+    if (this.isLoading() || this.isUpdating() || !this.memberId()) {
+      return;
+    }
+    this.updateSuccessMessage.set('');
+    this.isChangeImageProfile.set(true);
+  }
+
+  public onImageSaved(): void {
+    this.isChangeImageProfile.set(false);
+    this.updateSuccessMessage.set('Profile image updated successfully.');
+    this.pendingTasks.run(() => this.loadUserInfo());
+  }
 
   public openEditProfile(): void {
     if (this.isLoading() || this.isUpdating() || !this.memberId()) {
