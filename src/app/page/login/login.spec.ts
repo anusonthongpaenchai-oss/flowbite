@@ -103,6 +103,18 @@ describe('Login', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it('opens forgot password without submitting the sign-in form', async () => {
+    const button = fixture.nativeElement.querySelector(
+      'app-button[routerLink="/forgot-password"] button',
+    ) as HTMLButtonElement;
+
+    button.click();
+    await fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/forgot-password');
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
   it('marks invalid fields without requesting a login', async () => {
     component.email = 'invalid-email';
 

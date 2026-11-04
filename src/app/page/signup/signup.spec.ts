@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { api } from '../../../shared/api/api';
+import { routes } from '../../app.routes';
+import { Login } from '../login/login';
 import { Signup } from './signup';
 
 describe('Signup', () => {
@@ -32,7 +35,7 @@ describe('Signup', () => {
 
     await TestBed.configureTestingModule({
       imports: [Signup],
-      providers: [provideRouter([])],
+      providers: [provideRouter(routes)],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Signup);
@@ -51,7 +54,8 @@ describe('Signup', () => {
   it.each(['button', 'form'])('submits values entered through the native %s', async (submitVia) => {
     postMock.mockResolvedValueOnce(successResponse());
     const element = fixture.nativeElement as HTMLElement;
-    const clickNext = () => element.querySelector<HTMLButtonElement>('app-button button')!.click();
+    const clickNext = () =>
+      element.querySelector<HTMLButtonElement>('app-button[variant="primary"] button')!.click();
     const fillInputs = (values: string[]) => {
       const inputs = [...element.querySelectorAll<HTMLInputElement>('app-input input')];
       inputs.forEach((input, index) => {
@@ -101,19 +105,50 @@ describe('Signup', () => {
     expect(component.isSubmitting()).toBe(false);
   });
 
-  it('keeps navigation between pages 0 and 2 and retains entered values', () => {
-    component.back();
-    expect(component.page()).toBe(0);
+  it('opens login when Back is clicked on page 0 without submitting registration', async () => {
+    const harness = await RouterTestingHarness.create('/signup');
+    const signup = harness.routeDebugElement!.componentInstance as Signup;
+    const backButton =
+      harness.routeNativeElement!.querySelector<HTMLButtonElement>('.signup-back button')!;
+
+    expect(backButton.disabled).toBe(false);
+    expect(backButton.type).toBe('button');
+    expect(backButton.querySelector('img')?.getAttribute('src')).toBe('svg/icon/Vector.svg');
+
+    backButton.click();
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/');
+    expect(harness.routeDebugElement!.componentInstance).toBeInstanceOf(Login);
+    expect(signup.page()).toBe(0);
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('goes back from page 2 to 1 to 0 and retains entered values', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
     component.signupForm.setValue(registration);
     component.next();
     component.next();
     component.next();
+    await fixture.whenStable();
     expect(component.page()).toBe(2);
-    component.back();
-    expect(component.firstName).toBe(registration.firstName);
-    component.back();
-    component.back();
+    const backButton = fixture.nativeElement.querySelector(
+      '.signup-back button',
+    ) as HTMLButtonElement;
+
+    component.errorMessage.set('Previous error.');
+    backButton.click();
+    await fixture.whenStable();
+    expect(component.page()).toBe(1);
+    expect(component.signupForm.getRawValue()).toEqual(registration);
+    expect(component.errorMessage()).toBe('');
+
+    backButton.click();
+    await fixture.whenStable();
     expect(component.page()).toBe(0);
+    expect(component.signupForm.getRawValue()).toEqual(registration);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(postMock).not.toHaveBeenCalled();
   });
 
   it('validates only the current step before moving forward', () => {
@@ -165,7 +200,7 @@ describe('Signup', () => {
     expect(component.isSubmitting()).toBe(false);
   });
 
-  it('ignores duplicate submissions while a request is pending', async () => {
+  it('blocks Back navigation and duplicate submissions while a request is pending', async () => {
     let resolveRequest!: (value: AxiosResponse) => void;
     postMock.mockImplementationOnce(
       () =>
@@ -181,6 +216,16 @@ describe('Signup', () => {
     const request = component.handleSubmit();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('button[type="submit"]').disabled).toBe(true);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
+    const backButton = fixture.nativeElement.querySelector(
+      '.signup-back button',
+    ) as HTMLButtonElement;
+    expect(backButton.disabled).toBe(true);
+    backButton.click();
+    await component.back();
+    expect(component.page()).toBe(2);
+    expect(component.signupForm.getRawValue()).toEqual(registration);
+    expect(navigate).not.toHaveBeenCalled();
     await component.handleSubmit();
     expect(postMock).toHaveBeenCalledTimes(1);
 

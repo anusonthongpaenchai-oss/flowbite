@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { InputComponent } from '../../components/input/input';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { signupUser } from '../../../shared/api/auth/signup';
 import { Checkbox } from '../../components/checkbox/checkbox';
 import { Button } from '../../components/button/button';
@@ -14,6 +15,8 @@ import { termAndCondition } from '../../../shared/documents/terms';
   templateUrl: './signup.html',
 })
 export class Signup {
+  private readonly router = inject(Router);
+
   public termAndCondition = termAndCondition;
   readonly illustration = 'svg/singup/Illustration.svg';
   readonly logo = 'svg/Logo.svg';
@@ -78,13 +81,20 @@ export class Signup {
     this.pageIndex.update((page) => Math.min(2, Math.max(0, page + 1)));
   }
 
-  public back(): void {
+  public async back(): Promise<void> {
     if (this.isSubmitting()) {
       return;
     }
 
     this.errorMessage.set('');
-    this.pageIndex.update((page) => Math.min(2, Math.max(0, page - 1)));
+    const pg = this.page() - 1;
+
+    if (pg < 0) {
+      await this.router.navigateByUrl('/');
+      return;
+    }
+
+    this.pageIndex.set(pg);
   }
 
   // form value
