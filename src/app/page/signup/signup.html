@@ -40,23 +40,16 @@
         class="signup-card flex min-w-0 flex-col gap-5 rounded-2xl border border-[#f0f1f3] p-8 [@media(max-width:540px)]:px-4 [@media(max-width:540px)]:py-6"
         aria-labelledby="signup-title"
       >
-        <button
+        <app-button
+          class="signup-back self-start"
+          variant="secondary"
           type="button"
-          class="signup-back inline-flex cursor-pointer items-center gap-2 self-start rounded-lg border border-[#e5e7eb] px-3 py-2 text-[12px] leading-4 focus-visible:outline-offset-2 focus-visible:[outline:2px_solid_#1a56db] disabled:cursor-default"
-          (click)="back()"
-          [disabled]="page() === 0 || isSubmitting()"
+          icon="svg/icon/Vector.svg"
+          [disabled]="isSubmitting()"
+          (onClick)="back()"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path
-              d="m10 3-5 5 5 5"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
           Back
-        </button>
+        </app-button>
         @switch (page()) {
           @case (0) {
             <h1
