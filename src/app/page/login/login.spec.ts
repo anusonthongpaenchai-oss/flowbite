@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import type { AxiosResponse } from 'axios';
@@ -204,7 +205,8 @@ describe('Login', () => {
 
     expect(TestBed.inject(Router).url).toBe('/user-info');
     expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
-    const profilePage = harness.routeDebugElement!.componentInstance as UserInfo;
+    const profilePage = harness.routeDebugElement!.query(By.directive(UserInfo))
+      .componentInstance as UserInfo;
     expect(profilePage).toBeInstanceOf(UserInfo);
     expect(profilePage.firstName()).toBe('Updated Name');
     expect(profilePage.email()).toBe('member@example.com');

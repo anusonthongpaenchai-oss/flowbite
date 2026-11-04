@@ -6,6 +6,7 @@ import {
   inject,
   Input,
   Output,
+  signal,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -35,6 +36,13 @@ export class InputComponent implements ControlValueAccessor {
   @Output() valueChange = new EventEmitter<string>();
 
   public disabled = false;
+  readonly passwordVisible = signal(false);
+
+  togglePassword(): void {
+    if (!this.disabled) {
+      this.passwordVisible.update((visible) => !visible);
+    }
+  }
 
   writeValue(value: string | null | undefined): void {
     this.value = value ?? '';

@@ -1,5 +1,5 @@
 import { Component, computed, inject, OnInit, PendingTasks, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import {
   normalizeProfileUpdateRequest,
   profileUpdate,
@@ -10,14 +10,16 @@ import {
 import { Button } from '../../components/button/button';
 import { EditProfile } from '../../components/userInfo/edit-profile/edit-profile';
 import { ChangImage } from '../../components/userInfo/chang-image/chang-image';
+import { ChangPassword } from '../../components/userInfo/chang-password/chang-password';
 
 // api
 import { logout } from '../../../shared/api/auth/logout';
 import { getUserInfo } from '../../../shared/api/userInfo/userInfo';
+import { clearAuthSession } from '../../../shared/guard/auth';
 @Component({
-  imports: [RouterLink, Button, EditProfile, ChangImage],
+  imports: [Button, EditProfile, ChangImage, ChangPassword],
   selector: 'app-user-info',
-  styleUrl: './user-info.css',
+  host: { class: 'block' },
   templateUrl: './user-info.html',
 })
 export class UserInfo implements OnInit {
@@ -88,6 +90,7 @@ export class UserInfo implements OnInit {
   public facebookLink = signal<boolean>(true);
   public appleLink = signal<boolean>(false);
 
+  // social icon
   readonly socialAccounts = [
     { name: 'Google', icon: 'svg/social/Google.svg', linked: this.googleLink },
     { name: 'Facebook', icon: 'svg/social/Facebook.svg', linked: this.facebookLink },
@@ -101,6 +104,7 @@ export class UserInfo implements OnInit {
   public province = signal<string>('');
   public zipCode = signal<string>('');
 
+  // edit profile data
   readonly editProfileData = computed<ProfileUpdateRequest>(() => ({
     member: {
       m_name: this.firstName(),
@@ -130,6 +134,12 @@ export class UserInfo implements OnInit {
     this.isChangeImageProfile.set(false);
     this.updateSuccessMessage.set('Profile image updated successfully.');
     this.pendingTasks.run(() => this.loadUserInfo());
+  }
+
+  public async onPasswordChanged(): Promise<void> {
+    this.isChangePassword.set(false);
+    clearAuthSession();
+    await this.router.navigateByUrl('/', { replaceUrl: true });
   }
 
   public openEditProfile(): void {

@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { AxiosError, type AxiosResponse } from 'axios';
@@ -7,6 +8,7 @@ import type { ProfileUpdateRequest } from '../../../shared/api/userInfo/profileU
 import type { UserInfoResponse } from '../../../shared/api/userInfo/userInfo';
 import { clearAuthSession, getAuthSession, setAuthSession } from '../../../shared/guard/auth';
 import { routes } from '../../app.routes';
+import { AccountLayout } from '../../layouts/account-layout/account-layout';
 import { Login } from '../login/login';
 import { UserInfo } from './user-info';
 
@@ -258,7 +260,7 @@ describe('UserInfo', () => {
 
   it('logs out from the button, clears the session, and opens the login page', async () => {
     const harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/user-info', UserInfo);
+    await harness.navigateByUrl('/user-info', AccountLayout);
     await harness.fixture.whenStable();
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigateByUrl');
@@ -375,11 +377,117 @@ describe('UserInfo', () => {
     ).toHaveLength(1);
   });
 
+  it('cancels the password form and starts a new flow when reopened', async () => {
+    const element = render();
+    await fixture.whenStable();
+    expect(element.querySelector('app-chang-password')).toBeNull();
+    findButton(element, 'Change Password').click();
+    await fixture.whenStable();
+    fillFields(element, {
+      currentPassword: 'old-password',
+      newPassword: 'new-password',
+      confirmPassword: 'new-password',
+    });
+    postMock.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        message: 'OTP sent.',
+        data: { memberRef: 'cancelled-reference', expiresAt: new Date() },
+      },
+    } as AxiosResponse);
+    findButton(element, 'Next').click();
+    await fixture.whenStable();
+    fillFields(element, { otpCode: '001234' });
+
+    findButton(element, 'Back').click();
+    await fixture.whenStable();
+    expect(element.querySelector('.otp-digit')).toBeNull();
+    findButton(element, 'Back').click();
+    await fixture.whenStable();
+
+    expect(component.isChangePassword()).toBe(false);
+    expect(element.querySelector('app-chang-password')).toBeNull();
+    expect(putMock).not.toHaveBeenCalled();
+    expect(getAuthSession()).not.toBeNull();
+
+    findButton(element, 'Change Password').click();
+    await fixture.whenStable();
+
+    expect(
+      element.querySelector<HTMLInputElement>('[formControlName="currentPassword"] input')!.value,
+    ).toBe('');
+    expect(
+      element.querySelector<HTMLInputElement>('[formControlName="newPassword"] input')!.value,
+    ).toBe('');
+    expect(
+      element.querySelector<HTMLInputElement>('[formControlName="confirmPassword"] input')!.value,
+    ).toBe('');
+    expect(
+      element.querySelector<HTMLSelectElement>('select[formControlName="otpMethod"]')!.value,
+    ).toBe('sms');
+    expect(element.querySelector('[formControlName="otpCode"]')).toBeNull();
+    expect(findButton(element, 'Next').disabled).toBe(false);
+    expect(postMock).toHaveBeenCalledOnce();
+  });
+
+  it.each(['sms', 'email'] as const)(
+    'clears both session stores and opens Login after changing the password with %s OTP',
+    async (method) => {
+      const harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/user-info', AccountLayout);
+      await harness.fixture.whenStable();
+      localStorage.setItem('authSession', sessionStorage.getItem('authSession')!);
+      const router = TestBed.inject(Router);
+      const navigate = vi.spyOn(router, 'navigateByUrl');
+      const element = harness.routeNativeElement!;
+      findButton(element, 'Change Password').click();
+      await harness.fixture.whenStable();
+      fillFields(element, {
+        currentPassword: 'old-password',
+        newPassword: 'new-password',
+        confirmPassword: 'new-password',
+      });
+      const select = element.querySelector<HTMLSelectElement>(
+        'select[formControlName="otpMethod"]',
+      )!;
+      select.value = method;
+      select.dispatchEvent(new Event('change'));
+      postMock.mockResolvedValueOnce({
+        status: 200,
+        data: { data: { memberRef: `${method}-reference`, expiresAt: new Date() } },
+      } as AxiosResponse);
+
+      findButton(element, 'Next').click();
+      await harness.fixture.whenStable();
+      fillFields(element, { otpCode: '001234' });
+      findButton(element, 'Verify').click();
+      await harness.fixture.whenStable();
+
+      expect(postMock).toHaveBeenCalledExactlyOnceWith(`/v1/verify/${method}/send`);
+      expect(putMock).toHaveBeenCalledExactlyOnceWith('/v1/member/change-password', {
+        currentPassword: 'old-password',
+        newPassword: 'new-password',
+        confirmPassword: 'new-password',
+        otpMethod: method,
+        memberRef: `${method}-reference`,
+        otpCode: '001234',
+        token: '',
+      });
+      expect(sessionStorage.getItem('authSession')).toBeNull();
+      expect(localStorage.getItem('authSession')).toBeNull();
+      expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+      expect(router.url).toBe('/');
+      expect(harness.routeDebugElement!.componentInstance).toBeInstanceOf(Login);
+    },
+  );
+
   it.each(['button', 'icon'])(
     'returns from address to member without closing Edit Profile when clicking the Back %s',
     async (target) => {
       const harness = await RouterTestingHarness.create();
-      const userInfo = await harness.navigateByUrl('/user-info', UserInfo);
+      await harness.navigateByUrl('/user-info', AccountLayout);
+      const userInfo = harness.routeDebugElement!.query(By.directive(UserInfo))
+        .componentInstance as UserInfo;
       await harness.fixture.whenStable();
       const element = harness.routeNativeElement!;
       const findButton = (label: string) =>
@@ -523,7 +631,7 @@ describe('UserInfo', () => {
   function fillFields(element: HTMLElement, fields: Record<string, string>): void {
     for (const [name, value] of Object.entries(fields)) {
       const input = element.querySelector<HTMLInputElement>(
-        `app-input[formControlName="${name}"] input`,
+        name === 'otpCode' ? '.otp-digit' : `app-input[formControlName="${name}"] input`,
       )!;
       input.value = value;
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -676,14 +784,5 @@ describe('UserInfo', () => {
     expect(component.updateErrorMessage()).toBe('');
     expect(component.errorMessage()).toBe('Unable to reload the profile.');
     expect(component.isEditProfile()).toBe(false);
-  });
-
-  it('links the Deposit button to /hello', async () => {
-    const element = render();
-    await fixture.whenStable();
-
-    const deposit = element.querySelector<HTMLAnchorElement>('a[routerLink="/hello"]')!;
-    expect(deposit.textContent).toBe('Deposit');
-    expect(deposit.getAttribute('href')).toBe('/hello');
   });
 });
