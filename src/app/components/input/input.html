@@ -1,10 +1,33 @@
 <label class="flex w-full min-w-0 flex-col gap-2 text-sm font-medium text-gray-900">
   <span class="text-sm font-medium">{{ label }}</span>
-  <input
-    [type]="type"
-    [value]="value"
-    (input)="onInput($event)"
-    [placeholder]="placeholder"
-    class="w-full min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm leading-5 font-medium text-gray-900 placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-  />
+  <span class="relative block min-w-0">
+    <input
+      [type]="type === 'password' && passwordVisible() ? 'text' : type"
+      [value]="value"
+      [disabled]="disabled"
+      [readOnly]="readOnly"
+      [attr.aria-invalid]="error ? 'true' : null"
+      [class.border-red-500]="!!error"
+      [class.pr-12]="type === 'password'"
+      (input)="onInput($event)"
+      (blur)="onBlur()"
+      [placeholder]="placeholder"
+      class="w-full min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm leading-5 font-medium text-gray-900 placeholder:text-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+    />
+    @if (type === 'password') {
+      <button
+        type="button"
+        [disabled]="disabled"
+        [attr.aria-label]="passwordVisible() ? 'Hide password' : 'Show password'"
+        [attr.aria-pressed]="passwordVisible()"
+        (click)="togglePassword()"
+        class="absolute inset-y-0 right-2 inline-flex w-8 cursor-pointer items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-default disabled:opacity-50"
+      >
+        <img src="svg/icon/eye.svg" alt="" aria-hidden="true" class="size-5" />
+      </button>
+    }
+  </span>
+  @if (error) {
+    <span role="alert" class="text-sm font-normal text-red-600">{{ error }}</span>
+  }
 </label>
