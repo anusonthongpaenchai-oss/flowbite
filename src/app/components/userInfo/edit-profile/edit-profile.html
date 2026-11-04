@@ -1,0 +1,155 @@
+<div
+  class="fixed inset-0 z-[1000] flex overflow-y-auto bg-black/80 p-6 text-left text-sm leading-5 text-[#111928] max-[540px]:p-4"
+  (click)="onBackdropClick($event)"
+>
+  <section
+    class="m-auto box-border flex w-full max-w-[500px] shrink-0 flex-col gap-5 rounded-2xl border border-[#e5e7eb] bg-white p-8 max-[540px]:p-6 [&_app-input]:block [&_app-input]:min-w-0 [&_app-input_input]:h-[42px] [&_app-input_input]:border-[#d1d5db] [&_app-input_input]:bg-[#f9fafb] [&_app-input_input]:px-3.5 [&_app-input_input]:font-normal [&_app-input_label]:gap-1 [&_app-input_label]:text-[#111928]"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-profile-title"
+  >
+    <div class="flex justify-start">
+      <app-button
+        type="button"
+        [icon]="leftIcon"
+        variant="secondary"
+        [disabled]="isUpdating()"
+        (click)="onBack($event)"
+      >
+        Back
+      </app-button>
+    </div>
+
+    <h1 id="edit-profile-title" class="text-2xl leading-8 font-bold">Edit Profile</h1>
+
+    <form
+      class="m-0 flex flex-col gap-[18px]"
+      [formGroup]="editProfileForm"
+      [attr.aria-busy]="isUpdating()"
+      (ngSubmit)="pg() === 0 ? onNext() : onSubmit()"
+    >
+      <fieldset class="m-0 flex min-w-0 flex-col gap-[18px] border-0 p-0" [disabled]="isUpdating()">
+        @if (pg() === 0) {
+          <!-- member info -->
+          <ng-container formGroupName="member">
+            <!-- first name -->
+            <app-input
+              [label]="'First name (Eng)*'"
+              [placeholder]="'Please input'"
+              formControlName="m_name"
+              [error]="fieldError('m_name')"
+            ></app-input>
+
+            <!-- last name -->
+            <app-input
+              [label]="'Last name (Eng)*'"
+              [placeholder]="'Please input'"
+              formControlName="m_lastname"
+              [error]="fieldError('m_lastname')"
+            ></app-input>
+
+            <app-input
+              label="Gender (optional)"
+              placeholder="Please input"
+              formControlName="m_gender"
+              [error]="fieldError('m_gender')"
+            ></app-input>
+
+            <!-- country / region -->
+            <div class="relative [&_app-input_input]:pr-10">
+              <app-input
+                [label]="'Country/Region*'"
+                [placeholder]="'Please input'"
+                formControlName="m_country"
+                [error]="fieldError('m_country')"
+              ></app-input>
+              <span
+                class="pointer-events-none absolute top-[42px] right-[19px] block size-1.5 rotate-45 border-r-[1.5px] border-b-[1.5px] border-current"
+                aria-hidden="true"
+              ></span>
+            </div>
+
+            <!-- phone number -->
+            <div>
+              <div class="relative [&_app-input_input]:pl-[110px]">
+                <app-input
+                  [label]="'Phone number*'"
+                  [placeholder]="'123 4567 890'"
+                  formControlName="m_phone"
+                  [error]="fieldError('m_phone')"
+                ></app-input>
+                <span
+                  class="pointer-events-none absolute top-[25px] left-px flex h-10 w-[94px] items-center justify-center gap-2 rounded-l-[7px] border-r border-[#d1d5db] bg-[#f3f4f6]"
+                  aria-hidden="true"
+                >
+                  @if (phoneCode() === '+66') {
+                    <span class="text-base leading-none">TH</span>
+                  }
+                  <span>{{ phoneCode() }}</span>
+                  <span
+                    class="-mt-[3px] block size-1.5 rotate-45 border-r-[1.5px] border-b-[1.5px] border-current"
+                  ></span>
+                </span>
+              </div>
+              <p class="mt-1.5 text-sm leading-5 text-[#6b7280]">Enter a number between 0 and 9</p>
+            </div>
+          </ng-container>
+
+          <!-- email -->
+          <app-input label="Email" type="email" [value]="email()" [readOnly]="true"></app-input>
+        }
+
+        @if (pg() === 1) {
+          <h2 class="text-lg font-semibold">Address</h2>
+          <ng-container formGroupName="address">
+            <ng-container formGroupName="address">
+              <app-input
+                label="Address*"
+                placeholder="Please input"
+                formControlName="address_no"
+                [error]="fieldError('address_no')"
+              ></app-input>
+              <app-input
+                label="Sub-district*"
+                placeholder="Please input"
+                formControlName="address_district"
+                [error]="fieldError('address_district')"
+              ></app-input>
+              <app-input
+                label="District/City*"
+                placeholder="Please input"
+                formControlName="address_city"
+                [error]="fieldError('address_city')"
+              ></app-input>
+              <app-input
+                label="Province/State*"
+                placeholder="Please input"
+                formControlName="address_state"
+                [error]="fieldError('address_state')"
+              ></app-input>
+              <app-input
+                label="ZIP/Postal code*"
+                placeholder="Please input"
+                formControlName="address_zipcode"
+                [error]="fieldError('address_zipcode')"
+              ></app-input>
+            </ng-container>
+          </ng-container>
+        }
+
+        @if (errorMessage()) {
+          <p id="edit-profile-error" role="alert" class="text-sm text-red-700">
+            {{ errorMessage() }}
+          </p>
+        }
+        @if (serverError()) {
+          <p role="alert" class="text-sm text-red-700">{{ serverError() }}</p>
+        }
+
+        <app-button type="submit" variant="primary" [disabled]="isUpdating()">{{
+          isUpdating() ? 'Saving…' : pg() === 0 ? 'Next' : 'Save'
+        }}</app-button>
+      </fieldset>
+    </form>
+  </section>
+</div>

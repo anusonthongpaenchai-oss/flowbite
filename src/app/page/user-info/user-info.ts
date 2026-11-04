@@ -3,9 +3,14 @@ import { Router, RouterLink } from '@angular/router';
 import { logout } from '../../../shared/api/auth/logout';
 import { getUserInfo } from '../../../shared/api/userInfo/userInfo';
 import { Button } from '../../components/button/button';
-
+import { EditProfile } from '../../components/userInfo/edit-profile/edit-profile';
+import {
+  normalizeProfileUpdateRequest,
+  profileUpdate,
+  type ProfileUpdateRequest,
+} from '../../../shared/api/userInfo/profileUpdate';
 @Component({
-  imports: [RouterLink, Button],
+  imports: [RouterLink, Button, EditProfile],
   selector: 'app-user-info',
   styleUrl: './user-info.css',
   templateUrl: './user-info.html',
@@ -26,6 +31,9 @@ export class UserInfo implements OnInit {
   public isChangeImageProfile = signal<boolean>(false);
   public isChangePassword = signal<boolean>(false);
   public isEditProfile = signal<boolean>(false);
+  readonly isUpdating = signal(false);
+  readonly updateErrorMessage = signal('');
+  readonly updateSuccessMessage = signal('');
 
   // user info
   public memberId = signal<number>(0);
@@ -37,6 +45,7 @@ export class UserInfo implements OnInit {
   public gender = signal('');
   public country = signal('');
 
+  // edit profile
   readonly fullName = computed(
     () => [this.firstName(), this.lastName()].filter(Boolean).join(' ') || '—',
   );
@@ -86,6 +95,77 @@ export class UserInfo implements OnInit {
   public district = signal<string>('');
   public province = signal<string>('');
   public zipCode = signal<string>('');
+
+  readonly editProfileData = computed<ProfileUpdateRequest>(() => ({
+    member: {
+      m_name: this.firstName(),
+      m_lastname: this.lastName(),
+      m_phone: this.phone(),
+      m_gender: this.gender(),
+      m_country: this.country(),
+    },
+    address: {
+      address_no: this.address(),
+      address_district: this.subDistrict(),
+      address_city: this.district(),
+      address_state: this.province(),
+      address_zipcode: this.zipCode(),
+    },
+  }));
+
+  public openEditProfile(): void {
+    if (this.isLoading() || this.isUpdating() || !this.memberId()) {
+      return;
+    }
+    this.updateErrorMessage.set('');
+    this.updateSuccessMessage.set('');
+    this.isEditProfile.set(true);
+  }
+
+  public closeEditProfile(): void {
+    if (!this.isUpdating()) {
+      this.isEditProfile.set(false);
+      this.updateErrorMessage.set('');
+    }
+  }
+
+  public async onUpdate(body: ProfileUpdateRequest): Promise<void> {
+    if (this.isUpdating()) {
+      return;
+    }
+
+    this.isUpdating.set(true);
+    this.updateErrorMessage.set('');
+    this.updateSuccessMessage.set('');
+    const completeTask = this.pendingTasks.add();
+
+    try {
+      const update = normalizeProfileUpdateRequest(body);
+      const response = await profileUpdate(update);
+
+      this.firstName.set(update.member.m_name);
+      this.lastName.set(update.member.m_lastname);
+      this.phone.set(update.member.m_phone);
+      this.gender.set(update.member.m_gender);
+      this.country.set(update.member.m_country);
+      this.address.set(update.address.address_no);
+      this.subDistrict.set(update.address.address_district);
+      this.district.set(update.address.address_city);
+      this.province.set(update.address.address_state);
+      this.zipCode.set(update.address.address_zipcode);
+
+      this.isEditProfile.set(false);
+      this.updateSuccessMessage.set(response.message);
+      await this.loadUserInfo();
+    } catch (error) {
+      this.updateErrorMessage.set(
+        error instanceof Error ? error.message : 'Unable to update your profile. Please try again.',
+      );
+    } finally {
+      this.isUpdating.set(false);
+      completeTask();
+    }
+  }
 
   ngOnInit(): void {
     this.pendingTasks.run(() => this.loadUserInfo());
