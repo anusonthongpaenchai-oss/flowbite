@@ -11,6 +11,8 @@ import { accountChildRoutes } from './account.routes';
 export class AccountLayout {
   readonly tabs = accountChildRoutes.map((route) => ({
     label: route.data!['label'] as string,
-    url: route.path ? `/user-info/${route.path}` : '/user-info',
+    url:
+      (route.data?.['url'] as string | undefined) ??
+      (route.path ? `/user-info/${route.path}` : '/user-info'),
   }));
 }

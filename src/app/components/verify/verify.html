@@ -1,0 +1,81 @@
+@if (variant === 'pending') {
+  <div
+    class="flex w-full min-h-[258px] max-w-[266px] flex-col items-center justify-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 text-center"
+  >
+    <img [src]="shieldIcon" alt="" aria-hidden="true" class="size-12 shrink-0" />
+    <h3 class="text-lg font-bold text-[#000000]">KYC Pending</h3>
+    <p class="text-sm font-normal text-gray-500">Your KYC is under review.</p>
+  </div>
+} @else if (variant === 'approve') {
+  <div
+    class="flex w-full min-h-[258px] max-w-[266px] flex-col items-center justify-center gap-4 rounded-2xl border border-green-100 bg-green-50 p-4 text-center"
+  >
+    <img
+      [src]="shieldIcon"
+      alt=""
+      aria-hidden="true"
+      class="size-12 shrink-0"
+      style="
+        filter: brightness(0) saturate(100%) invert(62%) sepia(72%) saturate(542%) hue-rotate(85deg)
+          brightness(95%) contrast(90%);
+      "
+    />
+    <h3 class="text-lg font-bold text-[#000000]">KYC Approved</h3>
+    <p class="text-sm font-normal text-gray-500">Your KYC is verified.</p>
+    <div
+      class="flex flex-row items-center gap-1 rounded-md bg-[#def7ec] px-2.5 py-0.5 text-xs leading-[18px] font-medium text-[#03543f]"
+    >
+      <img [src]="approveIcon" alt="" aria-hidden="true" class="size-2.5 shrink-0" />
+      <span>Already Verify</span>
+    </div>
+  </div>
+} @else if (variant === 'reject') {
+  <div
+    class="flex w-full min-h-[258px] max-w-[266px] flex-col items-center justify-center gap-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-center"
+    [attr.aria-busy]="busy"
+  >
+    <img
+      [src]="shieldIcon"
+      alt=""
+      aria-hidden="true"
+      class="size-12 shrink-0"
+      style="
+        filter: brightness(0) saturate(100%) invert(36%) sepia(98%) saturate(2046%)
+          hue-rotate(335deg) brightness(98%) contrast(90%);
+      "
+    />
+    <h3 class="text-lg font-bold text-[#000000]">KYC Rejected</h3>
+    <p class="text-sm font-normal text-gray-500">Your KYC was not approved. Please try again.</p>
+    @if (reason) {
+      <p class="w-full break-words text-sm text-red-700">{{ reason }}</p>
+    }
+    <app-button variant="ghost" [disabled]="busy" (onClick)="requestVerification()" class="underline"
+      >Try again</app-button
+    >
+  </div>
+} @else {
+  <div
+    class="flex w-full min-h-[258px] max-w-[266px] flex-col items-center justify-center gap-4 rounded-2xl border border-yellow-100 bg-[#FFFDE9] p-4 text-center"
+    [attr.aria-busy]="busy"
+  >
+    <img
+      [src]="shieldIcon"
+      alt=""
+      aria-hidden="true"
+      class="size-12 shrink-0"
+      style="
+        filter: brightness(0) saturate(100%) invert(72%) sepia(87%) saturate(2145%) hue-rotate(9deg)
+          brightness(100%) contrast(93%);
+      "
+    />
+    <h3 class="text-lg font-bold text-[#000000]">KYC Verification</h3>
+    <p class="text-sm font-normal text-gray-500">You have not yet verified your identity.</p>
+    <app-button
+      variant="ghost"
+      class="[&_button]:text-yellow-700 underline"
+      [disabled]="busy"
+      (onClick)="requestVerification()"
+      >Verify</app-button
+    >
+  </div>
+}

@@ -8,6 +8,7 @@ import { filter, firstValueFrom } from 'rxjs';
 import { api } from '../../../shared/api/api';
 import { clearAuthSession, setAuthSession } from '../../../shared/guard/auth';
 import { routes } from '../../app.routes';
+import { Login } from '../../page/login/login';
 import { AccountLayout } from './account-layout';
 
 describe('AccountLayout', () => {
@@ -17,7 +18,7 @@ describe('AccountLayout', () => {
     { label: 'User information', url: '/user-info' },
     { label: 'Bank Account', url: '/user-info/bank-account' },
     { label: 'Crypto Wallet', url: '/user-info/crypto-wallet' },
-    { label: 'User verify', url: '/user-info/user-verify' },
+    { label: 'User verify', url: '/user/verify' },
   ];
   const member = {
     id: 1,
@@ -44,10 +45,16 @@ describe('AccountLayout', () => {
       expiresIn: 3600,
       sessionUid: 'test-session',
     });
-    getMock.mockReset().mockResolvedValue({
-      status: 200,
-      data: { result: true, message: 'Profile retrieved.', data: { member, address: null } },
-    } as AxiosResponse);
+    getMock.mockReset().mockImplementation(
+      async (url) =>
+        ({
+          status: 200,
+          data:
+            url === '/v1/verify/kyc'
+              ? { result: true, message: 'KYC retrieved.', data: { kyc_stat: 1 } }
+              : { result: true, message: 'Profile retrieved.', data: { member, address: null } },
+        }) as AxiosResponse,
+    );
     vi.spyOn(api, 'get').mockImplementation(getMock);
 
     await TestBed.configureTestingModule({
@@ -103,9 +110,14 @@ describe('AccountLayout', () => {
         expect(element.querySelector('.profile-name')?.textContent?.trim()).toBe('Test Member');
         expect(element.querySelector('app-account-placeholder')).toBeNull();
         expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
+      } else if (url === '/user/verify') {
+        expect(element.querySelector('app-verify')).not.toBeNull();
+        expect(element.querySelector('app-account-placeholder')).toBeNull();
+        expect(element.querySelector('app-verify-status')?.textContent).toContain('KYC Approved');
+        expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/verify/kyc');
       } else {
         expect(element.querySelector('#account-section-title')?.textContent?.trim()).toBe(label);
-        expect(element.textContent).toContain('This section is under development.');
+        expect(element.querySelector('app-account-placeholder')).not.toBeNull();
         expect(element.querySelector('.profile-card')).toBeNull();
         expect(element.querySelector('.profile-actions')).toBeNull();
         expect(getMock).not.toHaveBeenCalled();
@@ -113,13 +125,13 @@ describe('AccountLayout', () => {
     },
   );
 
-  it('switches all tabs while keeping the same layout, header, and navigation', async () => {
+  it('switches profile and placeholder tabs while keeping the same layout, header, and navigation', async () => {
     const element = await open('/user-info');
     const layout = harness.routeDebugElement!.componentInstance;
     const header = element.querySelector('.account-header');
     const navigation = element.querySelector('.account-tabs');
 
-    for (const tab of tabs.slice(1)) {
+    for (const tab of tabs.slice(1, 3)) {
       tabLink(element, tab.label).click();
       await harness.fixture.whenStable();
 
@@ -142,6 +154,52 @@ describe('AccountLayout', () => {
     expect(element.querySelector('.profile-name')?.textContent?.trim()).toBe('Test Member');
     expect(getMock).toHaveBeenCalledTimes(2);
     expect(harness.routeDebugElement!.componentInstance).toBe(layout);
+  });
+
+  it('opens verification from its tab and returns to the profile with one account layout', async () => {
+    const profileElement = await open('/user-info');
+    tabLink(profileElement, 'User verify').click();
+    await harness.fixture.whenStable();
+    const verifyElement = harness.routeNativeElement!;
+
+    expect(TestBed.inject(Router).url).toBe('/user/verify');
+    expectActiveTab(verifyElement, 'User verify');
+    expect(verifyElement.querySelector('app-verify')).not.toBeNull();
+    expect(verifyElement.querySelectorAll('.account-header')).toHaveLength(1);
+    expect(verifyElement.querySelectorAll('.account-tabs')).toHaveLength(1);
+    expect(getMock).toHaveBeenNthCalledWith(2, '/v1/verify/kyc');
+
+    tabLink(verifyElement, 'User information').click();
+    await harness.fixture.whenStable();
+    const returnedElement = harness.routeNativeElement!;
+
+    expect(TestBed.inject(Router).url).toBe('/user-info');
+    expectActiveTab(returnedElement, 'User information');
+    expect(returnedElement.querySelector('.profile-name')?.textContent?.trim()).toBe('Test Member');
+    expect(returnedElement.querySelectorAll('.account-header')).toHaveLength(1);
+    expect(returnedElement.querySelectorAll('.account-tabs')).toHaveLength(1);
+    expect(getMock).toHaveBeenCalledTimes(3);
+    expect(getMock).toHaveBeenLastCalledWith('/v1/member/profile');
+  });
+
+  it('redirects the legacy verification URL to the canonical route without loading twice', async () => {
+    const element = await open('/user-info/user-verify');
+
+    expect(TestBed.inject(Router).url).toBe('/user/verify');
+    expect(element.querySelector('app-verify')).not.toBeNull();
+    expectActiveTab(element, 'User verify');
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/verify/kyc');
+  });
+
+  it('redirects unauthenticated verification visits to login without requesting KYC', async () => {
+    clearAuthSession();
+    await harness.navigateByUrl('/user/verify', Login);
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/');
+    expect(harness.routeDebugElement!.componentInstance).toBeInstanceOf(Login);
+    expect(harness.routeNativeElement!.querySelector('app-account-layout')).toBeNull();
+    expect(getMock).not.toHaveBeenCalled();
   });
 
   it('updates the selected tab and placeholder on browser Back and Forward', async () => {

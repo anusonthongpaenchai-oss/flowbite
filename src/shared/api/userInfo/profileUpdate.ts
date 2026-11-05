@@ -8,6 +8,7 @@ export type MemberRequest = {
   m_country: string;
   m_phone: string;
   m_gender: string;
+  m_birthdate?: string;
 };
 
 export type AddressRequest = {
@@ -58,11 +59,18 @@ const fieldRules: Record<ProfileField, FieldRule> = {
   m_phone: {
     label: 'Phone number',
     required: true,
-    maxLength: 15,
-    pattern: /^\d{7,15}$/,
-    formatMessage: 'Phone number must contain 7–15 digits.',
+    maxLength: 16,
+    pattern: /^\+?\d{7,15}$/,
+    formatMessage: 'Phone number must contain 7–15 digits, optionally starting with +.',
   },
   m_gender: { label: 'Gender', required: false, maxLength: 50 },
+  m_birthdate: {
+    label: 'Date of birth',
+    required: false,
+    maxLength: 10,
+    pattern: /^\d{4}-\d{2}-\d{2}$/,
+    formatMessage: 'Date of birth must be a valid date in YYYY-MM-DD format.',
+  },
   address_no: { label: 'Address', required: true, maxLength: 255 },
   address_district: { label: 'Sub-district', required: true, maxLength: 100 },
   address_city: { label: 'District/City', required: true, maxLength: 100 },
@@ -93,6 +101,12 @@ export function profileFieldError(field: ProfileField, value: unknown): string {
   if (rule.pattern && !rule.pattern.test(text)) {
     return rule.formatMessage!;
   }
+  if (field === 'm_birthdate') {
+    const timestamp = Date.parse(`${text}T00:00:00.000Z`);
+    if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== text) {
+      return rule.formatMessage!;
+    }
+  }
   return '';
 }
 
@@ -112,8 +126,13 @@ export function normalizeProfileUpdateRequest(body: ProfileUpdateRequest): Profi
     return Object.fromEntries(entries) as T;
   };
 
+  const memberFields: ProfileField[] = ['m_name', 'm_lastname', 'm_country', 'm_phone', 'm_gender'];
+  if (body?.member?.m_birthdate !== undefined) {
+    memberFields.push('m_birthdate');
+  }
+
   return {
-    member: normalize(body?.member, ['m_name', 'm_lastname', 'm_country', 'm_phone', 'm_gender']),
+    member: normalize(body?.member, memberFields),
     address: normalize(body?.address, [
       'address_no',
       'address_district',

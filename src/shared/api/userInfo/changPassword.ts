@@ -17,11 +17,6 @@ export type ResponseChangPassword = {
   message: string;
 };
 
-type dataSend = {
-  memberRef: string;
-  expiresAt: Date;
-};
-
 type errorSend = {
   result: boolean;
   message: string;
@@ -29,16 +24,6 @@ type errorSend = {
     code: string;
     message: string;
   };
-};
-
-export type ResponseSendEmail = {
-  memberRef: string;
-  data: dataSend;
-};
-
-export type ResponseSendSms = {
-  message: string;
-  data: dataSend;
 };
 
 function requestError(error: unknown, fallback: string): Error {
@@ -49,32 +34,6 @@ function requestError(error: unknown, fallback: string): Error {
 
   return new Error(fallback);
 }
-
-export async function sendSms(): Promise<ResponseSendSms> {
-  if (!authGuard()) {
-    throw new Error('Please sign in to update your profile.');
-  }
-  try {
-    const response = await api.post<ResponseSendSms>('/v1/verify/sms/send');
-    return response.data;
-  } catch (error) {
-    throw requestError(error, 'Failed to send SMS. Please try again.');
-  }
-}
-
-export async function sendEmail(): Promise<ResponseSendEmail> {
-  if (!authGuard()) {
-    throw new Error('Please sign in to update your profile.');
-  }
-  try {
-    const response = await api.post<ResponseSendEmail>('/v1/verify/email/send');
-    return response.data;
-  } catch (error) {
-    throw requestError(error, 'Failed to send Email. Please try again.');
-  }
-}
-
-export async function sendTotp() {}
 
 export async function changPassword(body: RequestChangPassword): Promise<ResponseChangPassword> {
   if (!authGuard()) {
