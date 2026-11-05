@@ -16,10 +16,9 @@ import {
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import {
   changPassword,
-  sendEmail,
-  sendSms,
   type RequestChangPassword,
 } from '../../../../shared/api/userInfo/changPassword';
+import { sendEmail, sendSms } from '../../../../shared/api/kyc/sendOtp';
 import { InputComponent } from '../../input/input';
 import { Button } from '../../button/button';
 

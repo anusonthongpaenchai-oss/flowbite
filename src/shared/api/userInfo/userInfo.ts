@@ -11,6 +11,7 @@ export type MemberData = {
   m_phone: string;
   m_phone_code: string;
   m_gender: string;
+  m_birthdate?: string | null;
   m_nationality: string;
   m_country: string;
   m_state: string;

@@ -21,7 +21,8 @@ export const accountChildRoutes: Routes = [
   },
   {
     path: 'user-verify',
-    component: AccountPlaceholder,
-    data: { label: 'User verify' },
+    pathMatch: 'full',
+    redirectTo: '/user/verify',
+    data: { label: 'User verify', url: '/user/verify' },
   },
 ];

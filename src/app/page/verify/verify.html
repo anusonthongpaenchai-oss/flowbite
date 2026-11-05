@@ -1,0 +1,540 @@
+<section class="py-3 text-[#111928]" aria-labelledby="verify-page-title">
+  <h2 id="verify-page-title" class="mb-5 text-xl font-semibold">User Verify</h2>
+  @if (isLoading()) {
+    <p
+      role="status"
+      class="rounded-xl border border-gray-200 bg-gray-50 px-5 py-6 text-sm text-gray-500"
+    >
+      Loading KYC data...
+    </p>
+  } @else if (hasInitialLoadError()) {
+    <div class="rounded-xl border border-red-200 bg-red-50 p-5">
+      <p role="alert" class="mb-4 text-sm text-red-700">{{ errorMessage() }}</p>
+      <app-button (click)="loadKyc()" [disabled]="isBusy()">Retry</app-button>
+    </div>
+  } @else if (kycDetail() && !isVerificationOpen()) {
+    @switch (kycDetail()?.data.kyc_stat) {   
+      @case (0) {
+        <app-verify-status variant="pending" [busy]="isBusy()"></app-verify-status>
+      }
+      @case (1) {
+        <app-verify-status variant="approve" [busy]="isBusy()"></app-verify-status>
+      }
+      @case (2) {
+        <app-verify-status
+          variant="reject"
+          [reason]="kycDetail()?.data.kyc_reason ?? ''"
+          [busy]="isBusy()"
+          (verifyRequested)="openVerification()"
+        ></app-verify-status>
+      }
+      @default {
+        <app-verify-status
+          variant="None"
+          [busy]="isBusy()"
+          (verifyRequested)="openVerification()"
+        ></app-verify-status>
+      }
+    }
+  }
+</section>
+
+@if (isVerificationOpen() && canVerify() && (isRejected() || profileLoaded())) {
+  <dialog
+    #verificationDialog
+    class="m-auto box-border max-h-[calc(100dvh-24px)] w-[calc(100%-24px)] max-w-[650px] overflow-y-auto rounded-[20px] border border-[#e5e7eb] bg-white p-5 text-left font-sans text-sm leading-6 text-[#111928] backdrop:bg-[#1e1e1e]/95 sm:max-h-[calc(100dvh-40px)] sm:w-[calc(100%-40px)] sm:p-9 sm:text-base [&_app-button]:block [&_app-button_button]:min-h-10 [&_app-button_button]:rounded-lg [&_app-button_button]:text-sm [&_app-button_button]:leading-5 [&_app-button_button:disabled]:cursor-wait [&_app-button_button:disabled]:opacity-60 [&_app-input]:block [&_app-input]:min-w-0 [&_app-input_label]:text-sm [&_app-input_label]:font-normal sm:[&_app-input_label]:text-base [&_app-input_input]:h-12 [&_app-input_input]:rounded-lg [&_app-input_input]:border-[#d1d5db] [&_app-input_input]:bg-[#f9fafb] [&_app-input_input]:px-4 [&_app-input_input]:py-3 [&_app-input_input]:text-sm [&_app-input_input]:font-normal sm:[&_app-input_input]:text-base"
+    aria-labelledby="kyc-dialog-title"
+    [attr.aria-busy]="isBusy()"
+    (cancel)="onDialogCancel($event)"
+  >
+    <header
+      class="flex min-h-[38px] items-center gap-3 border-b border-[#f3f4f6] pb-[22px] sm:gap-[18px]"
+    >
+      @if (hasStarted()) {
+        <app-button
+          variant="secondary"
+          icon="svg/icon/Vector.svg"
+          class="shrink-0 [&_button]:h-[38px] [&_button]:min-h-[38px] [&_button]:gap-2.5 [&_button]:border-[#e5e7eb] [&_button]:bg-white [&_button]:px-3.5 [&_button]:py-2 [&_button_img]:size-3.5"
+          [disabled]="isBusy()"
+          (click)="onBack()"
+          >Back</app-button
+        >
+      }
+      <h2 id="kyc-dialog-title" class="min-w-0 flex-1 leading-tight text-lg font-bold sm:text-[22px]">
+        KYC Verification
+      </h2>
+      <button
+        type="button"
+        aria-label="Close KYC verification"
+        class="grid size-[38px] shrink-0 cursor-pointer place-items-center rounded-lg border border-[#e5e7eb] bg-white hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-50"
+        [disabled]="isBusy()"
+        (click)="closeVerification()"
+      >
+        <img src="svg/icon/x.svg" alt="" aria-hidden="true" class="size-3.5" />
+      </button>
+    </header>
+
+    @if (!hasStarted()) {
+      <section class="pt-8" aria-labelledby="kyc-preparation-title">
+        <img src="svg/kyc/shield-check.svg" alt="" aria-hidden="true" class="size-20" />
+        <h3 id="kyc-preparation-title" class="mt-8 text-base font-bold leading-7 sm:text-xl">
+          Things you need to prepare before verifying
+        </h3>
+        @if (kycDetail()?.data.kyc_stat === 2 && kycDetail()?.data.kyc_reason) {
+          <p role="alert" class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            {{ kycDetail()?.data.kyc_reason }}
+          </p>
+        }
+        <ul class="mt-6 flex list-none flex-col gap-6 p-0">
+          @for (item of preparationItems; track item) {
+            <li class="flex items-center gap-[18px]">
+              <span class="grid size-11 shrink-0 place-items-center rounded-[9px] bg-[#c3ddfd]">
+                <img src="svg/kyc/click.svg" alt="" aria-hidden="true" class="size-6" />
+              </span>
+              <span class="text-sm font-medium leading-tight sm:text-[17px]">{{ item }}</span>
+            </li>
+          }
+        </ul>
+        <app-button
+          class="mt-6 w-full [&_button]:bg-[#1a56e8]"
+          (click)="startVerification()"
+          [disabled]="isBusy()"
+          >Start Verify</app-button
+        >
+        <p class="mt-6 text-sm font-medium leading-6 sm:text-[17px]">
+          **If you do not verify documents that are within the grace period, your account will be
+          suspended.
+        </p>
+      </section>
+    } @else {
+      <nav class="relative mt-6" aria-label="KYC verification progress">
+        <div
+          class="pointer-events-none absolute inset-x-[16.6667%] top-[22px] flex h-[2px]"
+          aria-hidden="true"
+        >
+          <span class="flex-1" [class]="stepIndex() >= 2 ? 'bg-[#3f83f8]' : 'bg-[#9ca3af]'"></span>
+          <span class="flex-1" [class]="stepIndex() >= 3 ? 'bg-[#3f83f8]' : 'bg-[#9ca3af]'"></span>
+        </div>
+        <ol class="relative grid grid-cols-3 gap-2">
+          <li
+            class="flex flex-col items-center gap-2 text-center"
+            [attr.aria-current]="step() === 'profile' ? 'step' : null"
+          >
+            <span
+              class="grid size-[46px] place-items-center rounded-full border border-[#3f83f8] bg-[#3f83f8]"
+              ><img src="svg/icon/checklist.svg" alt="" aria-hidden="true" class="size-6"
+            /></span>
+            <span class="text-xs leading-6 font-medium sm:text-base">Personal Info</span>
+          </li>
+          <li
+            class="flex flex-col items-center gap-2 text-center"
+            [attr.aria-current]="step() === 'otp' ? 'step' : null"
+          >
+            <span
+              class="grid size-[46px] place-items-center rounded-full border"
+              [class]="
+                stepIndex() >= 2
+                  ? 'border-[#3f83f8] bg-[#3f83f8]'
+                  : 'border-dashed border-[#f3f4f6] bg-white'
+              "
+            >
+              <img
+                src="svg/kyc/message-circle-exclamation.svg"
+                alt=""
+                aria-hidden="true"
+                class="size-6"
+                [class]="stepIndex() >= 2 ? 'brightness-0 invert' : ''"
+              />
+            </span>
+            <span class="text-xs leading-6 font-medium sm:text-base">OTP Verify</span>
+          </li>
+          <li
+            class="flex flex-col items-center gap-2 text-center"
+            [attr.aria-current]="step() === 'id-proof' ? 'step' : null"
+          >
+            <span
+              class="grid size-[46px] place-items-center rounded-full border"
+              [class]="
+                stepIndex() >= 3
+                  ? 'border-[#3f83f8] bg-[#3f83f8]'
+                  : 'border-dashed border-[#f3f4f6] bg-white'
+              "
+            >
+              <img
+                src="svg/kyc/id.svg"
+                alt=""
+                aria-hidden="true"
+                class="size-6"
+                [class]="stepIndex() >= 3 ? 'brightness-0 invert' : ''"
+              />
+            </span>
+            <span class="text-xs leading-6 font-medium sm:text-base">ID Proof</span>
+          </li>
+        </ol>
+      </nav>
+
+      @if (step() === 'profile') {
+        <form
+          class="mt-10"
+          [formGroup]="profileForm"
+          (ngSubmit)="onUpdateProfile()"
+          [attr.aria-busy]="isSaving()"
+        >
+          <h3 class="mb-6 text-2xl leading-9 font-bold sm:text-[28px]">General information</h3>
+          <div
+            formGroupName="member"
+            class="grid grid-cols-1 gap-x-[18px] gap-y-5 min-[520px]:grid-cols-2"
+          >
+            <app-input
+              label="First name (Eng)*"
+              placeholder="Please input"
+              formControlName="m_name"
+              [error]="fieldError('m_name')"
+            ></app-input>
+            <app-input
+              label="Last name (Eng)*"
+              placeholder="Please input"
+              formControlName="m_lastname"
+              [error]="fieldError('m_lastname')"
+            ></app-input>
+            <div class="relative">
+              <app-input
+                label="Gender*"
+                placeholder="Please input"
+                formControlName="m_gender"
+                [error]="fieldError('m_gender')"
+                class="[&_input]:pr-10"
+              ></app-input>
+              <img
+                src="svg/icon/Vector.svg"
+                alt=""
+                aria-hidden="true"
+                class="pointer-events-none absolute top-[49px] right-4 size-2.5 -rotate-90"
+              />
+            </div>
+            <div class="relative">
+              <app-input
+                label="Country/Region*"
+                placeholder="Please input"
+                formControlName="m_country"
+                [error]="fieldError('m_country')"
+                class="[&_input]:pr-10"
+              ></app-input>
+              <img
+                src="svg/icon/Vector.svg"
+                alt=""
+                aria-hidden="true"
+                class="pointer-events-none absolute top-[49px] right-4 size-2.5 -rotate-90"
+              />
+            </div>
+          </div>
+
+          <h3 class="mt-6 mb-6 text-2xl leading-9 font-bold sm:text-[28px]">Address</h3>
+          <div
+            formGroupName="member"
+            class="grid grid-cols-1 gap-x-[18px] gap-y-5 min-[520px]:grid-cols-2"
+          >
+            <app-input
+              label="Phone"
+              type="tel"
+              placeholder="Please input"
+              formControlName="m_phone"
+              [error]="fieldError('m_phone')"
+            ></app-input>
+            <app-input
+              label="Date of birth"
+              type="date"
+              placeholder="Please input"
+              formControlName="m_birthdate"
+              [error]="fieldError('m_birthdate')"
+            ></app-input>
+          </div>
+          <div
+            formGroupName="address"
+            class="mt-5 grid grid-cols-1 gap-x-[18px] gap-y-5 min-[520px]:grid-cols-2"
+          >
+            <app-input
+              label="Address*"
+              placeholder="Please input"
+              formControlName="address_no"
+              [error]="fieldError('address_no')"
+              class="min-[520px]:col-span-2"
+            ></app-input>
+            <app-input
+              label="District*"
+              placeholder="Please input"
+              formControlName="address_city"
+              [error]="fieldError('address_city')"
+            ></app-input>
+            <app-input
+              label="State/Province*"
+              placeholder="Please input"
+              formControlName="address_state"
+              [error]="fieldError('address_state')"
+            ></app-input>
+            <app-input
+              label="Zipcode*"
+              placeholder="Please input"
+              formControlName="address_zipcode"
+              [error]="fieldError('address_zipcode')"
+            ></app-input>
+            <app-input
+              label="Sub-district*"
+              placeholder="Please input"
+              formControlName="address_district"
+              [error]="fieldError('address_district')"
+            ></app-input>
+          </div>
+          @if (m_phone_code() === '+66') {
+            <label
+              for="kyc-otp-method"
+              class="mt-6 flex items-center justify-between gap-4 text-sm text-[#6b7280]"
+            >
+              <span>Send OTP by</span>
+              <span class="relative">
+                <select
+                  id="kyc-otp-method"
+                  class="min-w-28 appearance-none rounded-lg border border-[#d1d5db] bg-[#f9fafb] py-2 pr-9 pl-3 text-[#111928] focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-60"
+                  [value]="otpMethod()"
+                  [disabled]="isBusy()"
+                  (change)="setOtpMethod($any($event.target).value)"
+                >
+                  <option value="sms">SMS</option>
+                  <option value="email">Email</option>
+                </select>
+                <img
+                  src="svg/icon/Vector.svg"
+                  alt=""
+                  aria-hidden="true"
+                  class="pointer-events-none absolute top-1/2 right-3 size-2.5 -translate-y-1/2 -rotate-90"
+                />
+              </span>
+            </label>
+          }
+          @if (errorMessage()) {
+            <p role="alert" class="mt-4 text-sm text-red-600">{{ errorMessage() }}</p>
+          }
+          <app-button
+            type="submit"
+            class="mt-6 w-full [&_button]:bg-[#1a56e8]"
+            [disabled]="isBusy()"
+            >{{ isSaving() ? 'Saving...' : 'Next' }}</app-button
+          >
+        </form>
+      } @else if (step() === 'otp') {
+        <form
+          class="mt-10"
+          [formGroup]="otpForm"
+          (ngSubmit)="onVerifyOtp()"
+          [attr.aria-busy]="isBusy()"
+        >
+          <h3 class="text-2xl leading-9 font-bold sm:text-[28px]">Please enter your code</h3>
+          <p id="kyc-otp-help" class="mt-1 text-base leading-7 text-[#6b7280] sm:text-lg">
+            Please check the OTP sent to your {{ otpMethod() === 'sms' ? 'SMS' : 'email' }}.
+          </p>
+          <input type="hidden" formControlName="otpCode" />
+          <div
+            class="mt-6 grid grid-cols-6 gap-2 sm:gap-[18px]"
+            role="group"
+            aria-label="OTP code"
+            aria-describedby="kyc-otp-help"
+          >
+            @for (position of otpPositions; track position) {
+              <input
+                #otpDigit
+                type="text"
+                inputmode="numeric"
+                maxlength="1"
+                class="otp-digit h-14 w-full min-w-0 rounded-lg border border-[#e5e7eb] bg-white p-0 text-center text-[28px] leading-none font-bold text-[#111928] caret-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60 sm:h-[72px] sm:text-[40px]"
+                [value]="otpDigits()[position]"
+                [attr.autocomplete]="position === 0 ? 'one-time-code' : 'off'"
+                [attr.aria-label]="'OTP digit ' + (position + 1)"
+                [attr.aria-invalid]="otpError() ? 'true' : null"
+                [disabled]="isBusy() || otpVerified()"
+                (focus)="otpDigit.select()"
+                (input)="onOtpInput(position, $event)"
+                (paste)="onOtpPaste(position, $event)"
+                (keydown)="onOtpKeydown(position, $event)"
+              />
+            }
+          </div>
+          @if (otpError()) {
+            <p role="alert" class="mt-3 text-sm text-red-600">{{ otpError() }}</p>
+          }
+          @if (errorMessage()) {
+            <p role="alert" class="mt-3 text-sm text-red-600">{{ errorMessage() }}</p>
+          }
+          <app-button
+            type="submit"
+            class="mt-[22px] w-full [&_button]:bg-[#1a56e8]"
+            [disabled]="isBusy() || !otpSent()"
+            >{{
+              isVerifyingOtp() ? 'Verifying OTP...' : otpVerified() ? 'Next' : 'Verify'
+            }}</app-button
+          >
+        </form>
+        <div
+          class="mt-[22px] flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-lg bg-[#f9fafb] px-4 py-4 text-sm leading-6 text-[#6b7280] sm:text-base"
+        >
+          <span
+            >Did you not receive the {{ otpMethod() === 'sms' ? 'SMS message' : 'email' }}?</span
+          >
+          <button
+            type="button"
+            class="cursor-pointer text-[#1c64f2] underline underline-offset-4 disabled:cursor-wait disabled:opacity-50"
+            [disabled]="isBusy()"
+            (click)="sendOtp()"
+          >
+            {{ isSendingOtp() ? 'Sending OTP...' : 'Please send it again.' }}
+          </button>
+        </div>
+        <label
+          for="kyc-otp-method"
+          class="mt-4 flex items-center justify-end gap-3 text-xs text-[#6b7280]"
+        >
+          <span>Send OTP by</span>
+          <select
+            id="kyc-otp-method"
+            class="rounded-md border border-[#d1d5db] bg-white px-2 py-1 text-sm text-[#111928] focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-60"
+            [value]="otpMethod()"
+            [disabled]="isBusy()"
+            (change)="setOtpMethod($any($event.target).value)"
+          >
+            <option value="sms">SMS</option>
+            <option value="email">Email</option>
+          </select>
+        </label>
+      } @else if (step() === 'id-proof') {
+        <form
+          class="mt-8"
+          [formGroup]="imageForm"
+          (ngSubmit)="onSubmitImage()"
+          [attr.aria-busy]="isUploadingImage()"
+        >
+          <label for="kyc-id-type" class="mb-2 block">Select your ID type</label>
+          <div class="relative">
+            <select
+              id="kyc-id-type"
+              formControlName="kycIdType"
+              class="h-12 w-full appearance-none rounded-lg border border-[#d1d5db] bg-[#f9fafb] py-3 pr-10 pl-4 text-[#111928] focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60"
+            >
+              <option value="" disabled>Please input</option>
+              @for (idType of kycIdTypes; track idType) {
+                <option [value]="idType">{{ idType }}</option>
+              }
+            </select>
+            <img
+              src="svg/icon/Vector.svg"
+              alt=""
+              aria-hidden="true"
+              class="pointer-events-none absolute top-1/2 right-4 size-2.5 -translate-y-1/2 -rotate-90"
+            />
+          </div>
+          <h3 class="mt-6 mb-5 text-base font-normal">Upload file</h3>
+          @if (idImagePreview()) {
+            <div class="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-4">
+              <img
+                [src]="idImagePreview()"
+                alt="ID preview"
+                class="mx-auto max-h-48 w-auto max-w-full rounded-lg object-contain"
+              />
+              <p class="mt-3 truncate text-center text-sm text-[#6b7280]">
+                {{ selectedIdFile()?.name }}
+              </p>
+              <div class="mt-3 flex justify-center gap-3">
+                <app-button variant="secondary" [disabled]="isBusy()" (click)="idImageInput.click()"
+                  >Change image</app-button
+                >
+                <app-button variant="ghost" [disabled]="isBusy()" (click)="removeIdImage()"
+                  >Remove</app-button
+                >
+              </div>
+            </div>
+          } @else {
+            <div
+              class="flex min-h-[214px] flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed bg-[#f9fafb] px-4 py-6 text-center text-[#6b7280] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              [class]="isDraggingImage() ? 'border-blue-500 bg-blue-50' : 'border-[#e5e7eb]'"
+              role="button"
+              [attr.tabindex]="isBusy() ? -1 : 0"
+              aria-label="Upload ID document"
+              [attr.aria-disabled]="isBusy()"
+              (click)="!isBusy() && idImageInput.click()"
+              (keydown)="onImagePickerKeydown($event, idImageInput)"
+              (dragover)="onIdImageDragOver($event)"
+              (dragleave)="isDraggingImage.set(false)"
+              (drop)="onIdImageDrop($event)"
+            >
+              <img src="svg/icon/upload-outline.svg" alt="" aria-hidden="true" class="size-5" />
+              <p class="text-sm sm:text-base">
+                <span class="font-semibold">Click to upload</span> or drag and drop
+              </p>
+              <p class="text-xs leading-5 font-medium sm:text-sm">
+                Max. File Size: 5MB / File Support : JPG, JPEG, PNG
+              </p>
+              <app-button
+                class="mt-1 [&_button]:bg-[#1a56e8] [&_button]:px-3 [&_button]:py-2"
+                [disabled]="isBusy()"
+                (click)="$event.stopPropagation(); idImageInput.click()"
+              >
+                <svg aria-hidden="true" class="size-3.5" viewBox="0 0 20 20" fill="none">
+                  <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.7" />
+                  <path
+                    d="m13 13 4 4"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                Browse File
+              </app-button>
+            </div>
+          }
+          <input
+            #idImageInput
+            type="file"
+            accept="image/png, image/jpeg, image/jpg"
+            class="hidden"
+            [disabled]="isBusy()"
+            (change)="onIdImageSelected($event)"
+          />
+          @if (errorMessage()) {
+            <p role="alert" class="mt-3 text-sm text-red-600">{{ errorMessage() }}</p>
+          }
+          <ul class="mt-5 list-disc pl-5 text-xs leading-5 text-[#6b7280] sm:text-sm">
+            <li>
+              Clearly readable in all 4 corners of the document, both front and back(optional)
+            </li>
+            <li>Documents must be submitted both front and back(optional)</li>
+            <li>The accepted file formats are JPG, JPEG, PNG</li>
+            <li>The maximum file size that can be uploaded is 5MB</li>
+          </ul>
+          <div
+            class="mt-4 flex flex-col gap-4 rounded-2xl bg-[#f3f4f6] p-4 text-sm leading-5 text-[#6b7280] min-[520px]:flex-row min-[520px]:items-start"
+          >
+            <div class="min-w-0 flex-1">
+              <h4 class="font-semibold">Sample ID card photo</h4>
+              <p class="mt-5">
+                ** Sign a certificate on the paper and write the message:<br />**<br />“ Used to
+                open a trading account with Guze Markets only ”
+              </p>
+            </div>
+            <img
+              [src]="sampleDocumentImage()"
+              [alt]="
+                isPassportSample() ? 'Sample passport document' : 'Sample Thai national ID card'
+              "
+              class="mx-auto max-w-full shrink-0 rounded-lg object-contain"
+              [class]="isPassportSample() ? 'h-[163px] w-[123px]' : 'w-full min-[520px]:w-[306px]'"
+            />
+          </div>
+          <app-button
+            type="submit"
+            class="mt-6 w-full [&_button]:bg-[#1a56e8]"
+            [disabled]="isBusy()"
+            >{{ isUploadingImage() ? 'Uploading...' : 'Next' }}</app-button
+          >
+        </form>
+      }
+    }
+  </dialog>
+}
