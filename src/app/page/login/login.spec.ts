@@ -7,6 +7,7 @@ import { api } from '../../../shared/api/api';
 import { Login } from './login';
 import { routes } from '../../app.routes';
 import { UserInfo } from '../user-info/user-info';
+import { stopTokenRefresh } from '../../../shared/services/tokenRefreshScheduler';
 
 describe('Login', () => {
   let component: Login;
@@ -72,6 +73,7 @@ describe('Login', () => {
   });
 
   afterEach(() => {
+    stopTokenRefresh();
     localStorage.removeItem('authSession');
     sessionStorage.removeItem('authSession');
     vi.restoreAllMocks();
@@ -174,7 +176,10 @@ describe('Login', () => {
 
       await component.handleSubmit();
 
-      expect(JSON.parse(selectedStorage.getItem('authSession')!)).toEqual(sessionData);
+      expect(JSON.parse(selectedStorage.getItem('authSession')!)).toEqual({
+        ...sessionData,
+        tokenExpiresAt: expect.any(Number),
+      });
       expect(otherStorage.getItem('authSession')).toBeNull();
       expect(selectedStorage.getItem('authSession')).not.toContain('test-password');
       expect(component.password).toBe('');
@@ -187,7 +192,10 @@ describe('Login', () => {
   it('stores the session before opening the profile page and loading its signals', async () => {
     postMock.mockResolvedValueOnce(successfulResponse());
     const getMock = vi.spyOn(api, 'get').mockImplementationOnce(async () => {
-      expect(JSON.parse(sessionStorage.getItem('authSession')!)).toEqual(sessionData);
+      expect(JSON.parse(sessionStorage.getItem('authSession')!)).toEqual({
+        ...sessionData,
+        tokenExpiresAt: expect.any(Number),
+      });
       return response({
         result: true,
         message: 'Profile retrieved.',
