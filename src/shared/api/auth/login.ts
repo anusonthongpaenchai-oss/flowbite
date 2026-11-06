@@ -5,19 +5,19 @@ export interface Member {
   id: number;
   username: string;
   email: string;
-  m_image_url: string;
-  m_image_path: string;
-  m_name: string;
-  m_lastname: string;
-  isKYC: number;
-  ib: number;
-  ibType: number;
-  mt5_category: number;
-  member_roles: unknown[];
+  m_image_url?: string;
+  m_image_path?: string;
+  m_name?: string;
+  m_lastname?: string;
+  isKYC?: number;
+  ib?: number;
+  ibType?: number;
+  mt5_category?: number;
+  member_roles?: unknown[];
 }
 
 export interface LoginData {
-  require2FA: boolean;
+  require2FA: false;
   member: Member;
   accessToken: string;
   refreshToken: string;
@@ -25,10 +25,15 @@ export interface LoginData {
   sessionUid: string;
 }
 
+export interface Login2FAData {
+  require2FA: true;
+  preAuthToken: string;
+}
+
 export interface LoginResponse {
   result: boolean | string;
   message: string;
-  data?: LoginData | null;
+  data?: LoginData | Login2FAData | null;
   code?: number;
   error?: {
     code?: string;

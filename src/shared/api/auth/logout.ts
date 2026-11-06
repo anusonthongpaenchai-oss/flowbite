@@ -32,10 +32,7 @@ export async function logout(): Promise<void> {
   }
 
   const response = res.data as Partial<LogoutResponse> | null;
-  const isSuccess =
-    res.status >= 200 &&
-    res.status < 300 &&
-    (response?.result === true);
+  const isSuccess = res.status >= 200 && res.status < 300 && response?.result === true;
 
   if (!isSuccess) {
     const detail =

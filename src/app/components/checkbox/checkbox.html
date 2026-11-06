@@ -5,6 +5,7 @@
       [checked]="checked"
       [disabled]="disabled"
       (change)="onChange($event)"
+      (blur)="onBlur()"
       class="peer h-4 w-4 appearance-none rounded-[4px] border-[0.5px] border-gray-300 bg-gray-50 checked:border-blue-600 checked:bg-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed forced-colors:appearance-auto"
     />
     <svg
@@ -13,7 +14,13 @@
       fill="none"
       class="pointer-events-none absolute inset-0 hidden h-4 w-4 text-white peer-checked:block forced-colors:hidden"
     >
-      <path d="m4 8 3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      <path
+        d="m4 8 3 3 5-6"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
     </svg>
   </span>
   <span class="text-sm font-medium text-gray-500">{{ label }}</span>
