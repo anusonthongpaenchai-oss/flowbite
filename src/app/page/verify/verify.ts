@@ -31,9 +31,15 @@ import {
   type ProfileField,
 } from '../../../shared/api/userInfo/profileUpdate';
 import { getUserInfo } from '../../../shared/api/userInfo/userInfo';
+import {
+  getAuthSession,
+  getRememberedAuthSession,
+  setAuthSession,
+} from '../../../shared/guard/auth';
 import { InputComponent } from '../../components/input/input';
 import { Button } from '../../components/button/button';
 import { Verify as VerifyStatus } from '../../components/verify/verify';
+import { GoogleAuth } from '../../components/google-auth/google-auth';
 
 type VerifyStep = 'profile' | 'otp' | 'id-proof';
 type OtpMethod = 'sms' | 'email';
@@ -46,7 +52,7 @@ function profileValidator(field: ProfileField): ValidatorFn {
 }
 
 @Component({
-  imports: [InputComponent, Button, ReactiveFormsModule, VerifyStatus],
+  imports: [InputComponent, Button, ReactiveFormsModule, VerifyStatus, GoogleAuth],
   selector: 'app-verify',
   styleUrl: './verify.css',
   templateUrl: './verify.html',
@@ -62,6 +68,7 @@ export class Verify implements OnInit {
   private readonly otpRequest = signal<{ method: OtpMethod; memberRef: string } | null>(null);
 
   public readonly kycDetail = signal<KycResponse | null>(null);
+  public readonly require2fa = signal(getAuthSession()?.twoFaEnabled === true);
   public readonly step = signal<VerifyStep>('profile');
   public readonly hasStarted = signal(false);
   public readonly isVerificationOpen = signal(false);
@@ -204,6 +211,14 @@ export class Verify implements OnInit {
 
   ngOnInit(): void {
     void this.loadKyc();
+  }
+
+  public onTwoFaEnabled(enabled: boolean): void {
+    this.require2fa.set(enabled);
+    const session = getAuthSession();
+    if (session) {
+      setAuthSession({ ...session, twoFaEnabled: enabled }, getRememberedAuthSession() !== null);
+    }
   }
 
   public openVerification(): void {

@@ -1,6 +1,11 @@
 import type { LoginData } from '../api/auth/login';
+import { saveDeviceSessionUid } from '../services/deviceSession';
 
-export type AuthSession = LoginData & { tokenExpiresAt?: number };
+export type AuthSession = LoginData & {
+  tokenExpiresAt?: number;
+  twoFaEnabled?: boolean;
+  rememberDevice?: boolean;
+};
 
 export type AuthHeaders = {
   Authorization: string;
@@ -49,10 +54,12 @@ export function setAuthSession(session: AuthSession, rememberMe = false): void {
   }
 
   const storage = rememberMe ? window.localStorage : window.sessionStorage;
-  const otherStorage = rememberMe ? window.sessionStorage : window.localStorage;
-
   storage.setItem(storageKey, JSON.stringify(session));
-  otherStorage.removeItem(storageKey);
+  try {
+    const otherStorage = rememberMe ? window.sessionStorage : window.localStorage;
+    otherStorage.removeItem(storageKey);
+  } catch {}
+  saveDeviceSessionUid(session.sessionUid);
   sessionListeners.forEach((listener) => listener());
 }
 
@@ -101,8 +108,20 @@ export function clearAuthSession(): void {
     return;
   }
 
-  window.localStorage.removeItem(storageKey);
-  window.sessionStorage.removeItem(storageKey);
+  // Migrate sessions created before device IDs were stored separately.
+  const session = getAuthSession();
+  if (session) {
+    saveDeviceSessionUid(session.sessionUid);
+  }
+
+  for (const storageName of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      window[storageName].removeItem(storageKey);
+    } catch {}
+  }
+  if (getAuthSession()) {
+    throw new Error('Unable to clear your session. Please try again.');
+  }
   sessionListeners.forEach((listener) => listener());
 }
 

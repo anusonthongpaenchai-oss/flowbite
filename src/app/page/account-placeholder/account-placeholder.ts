@@ -1,5 +1,5 @@
-import { Component, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { Component, inject } from '@angular/core';
 @Component({
   selector: 'app-account-placeholder',
   host: { class: 'block' },

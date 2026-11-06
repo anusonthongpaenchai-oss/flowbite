@@ -1,10 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { By } from '@angular/platform-browser';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { api } from '../../../shared/api/api';
 import type { KycResponse } from '../../../shared/api/kyc/getKyc';
 import type { UserInfoResponse } from '../../../shared/api/userInfo/userInfo';
-import { clearAuthSession, setAuthSession } from '../../../shared/guard/auth';
+import {
+  clearAuthSession,
+  getAuthSession,
+  getRememberedAuthSession,
+  setAuthSession,
+} from '../../../shared/guard/auth';
+import { GoogleAuth } from '../../components/google-auth/google-auth';
 import { Verify } from './verify';
 
 describe('Verify KYC flow', () => {
@@ -224,7 +231,8 @@ describe('Verify KYC flow', () => {
   }
 
   function button(text: string): HTMLButtonElement | undefined {
-    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+    const scope = verificationDialog() ?? (fixture.nativeElement as HTMLElement);
+    return Array.from(scope.querySelectorAll('button')).find(
       (element) => element.textContent?.trim() === text,
     );
   }
@@ -234,6 +242,73 @@ describe('Verify KYC flow', () => {
       response(url === '/v1/verify/kyc' ? kycResponse() : value),
     );
   }
+
+  it.each([
+    [0, 'KYC Pending'],
+    [1, 'KYC Approved'],
+    [2, 'KYC Rejected'],
+    [3, 'KYC Verification'],
+  ] as const)(
+    'shows both cards together after loading KYC status %s without a loading message',
+    async (status, title) => {
+      const pending = deferredResponse();
+      getMock.mockReturnValueOnce(pending.promise);
+      const element = render();
+      expect(element.querySelector('app-verify-status')).toBeNull();
+      expect(element.querySelector('app-google-auth')).toBeNull();
+      expect(element.textContent).not.toContain('Loading KYC data...');
+      expect(component.isVerificationOpen()).toBe(false);
+
+      pending.resolve(response(kycResponse(status)));
+      await fixture.whenStable();
+
+      expect(element.querySelector('app-verify-status h3')?.textContent?.trim()).toBe(title);
+      expect(element.querySelector('app-google-auth')).not.toBeNull();
+    },
+  );
+
+  it('renders Google Authenticator beside KYC and opens its own preparation dialog', async () => {
+    const element = render();
+    await fixture.whenStable();
+    const auth = element.querySelector('app-google-auth')!;
+    expect(element.querySelector('app-verify-status')).not.toBeNull();
+    expect(auth.textContent).toContain('Enable Two-Factor Authentication');
+    auth.querySelector('button')!.click();
+    await fixture.whenStable();
+    expect(auth.querySelector('dialog')?.textContent).toContain('Things you need to prepare');
+    expect(component.isVerificationOpen()).toBe(false);
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('shows Already Verify from the saved login challenge state without offering setup', async () => {
+    setAuthSession({ ...getAuthSession()!, twoFaEnabled: true });
+    const element = render();
+    await fixture.whenStable();
+    const auth = element.querySelector('app-google-auth')!;
+    expect(auth.textContent).toContain('Already Verify');
+    expect(auth.querySelector('button')).toBeNull();
+    expect(component.require2fa()).toBe(true);
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    'persists completed setup across page recreation, Remember me = %s',
+    async (rememberMe) => {
+      setAuthSession(getAuthSession()!, rememberMe);
+      render();
+      await fixture.whenStable();
+      const auth = fixture.debugElement.query(By.directive(GoogleAuth))
+        .componentInstance as GoogleAuth;
+      auth.require2fa.set(true);
+      await fixture.whenStable();
+      expect(getAuthSession()?.twoFaEnabled).toBe(true);
+      expect(getRememberedAuthSession() !== null).toBe(rememberMe);
+      fixture.destroy();
+      const element = render();
+      await fixture.whenStable();
+      expect(element.querySelector('app-google-auth')?.textContent).toContain('Already Verify');
+    },
+  );
 
   async function load(): Promise<HTMLElement> {
     const element = render();
@@ -573,13 +648,16 @@ describe('Verify KYC flow', () => {
     expect(putMock).not.toHaveBeenCalled();
   });
 
-  it('keeps loading until the profile is ready and ignores a duplicate load', async () => {
+  it('waits for the profile before showing both cards and ignores a duplicate load', async () => {
     const pending = deferredResponse();
     getMock.mockResolvedValueOnce(response(kycResponse())).mockReturnValueOnce(pending.promise);
     const element = render();
     await vi.waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
 
     expect(component.isLoading()).toBe(true);
+    expect(element.querySelector('app-verify-status')).toBeNull();
+    expect(element.querySelector('app-google-auth')).toBeNull();
+    expect(element.textContent).not.toContain('Loading KYC data...');
     expect(element.querySelector('form')).toBeNull();
     await component.loadKyc();
     expect(getMock).toHaveBeenCalledTimes(2);
@@ -587,6 +665,8 @@ describe('Verify KYC flow', () => {
     pending.resolve(response(profile));
     await fixture.whenStable();
     expect(component.isLoading()).toBe(false);
+    expect(element.querySelector('app-verify-status')).not.toBeNull();
+    expect(element.querySelector('app-google-auth')).not.toBeNull();
     component.startVerification();
     await fixture.whenStable();
     expect(input('m_name')?.value).toBe('Test');
@@ -599,11 +679,15 @@ describe('Verify KYC flow', () => {
     expect(component.errorMessage()).not.toBe('');
     expect(component.isLoading()).toBe(false);
     expect(element.querySelector('form')).toBeNull();
+    expect(element.querySelector('app-verify-status')).toBeNull();
+    expect(element.querySelector('app-google-auth')).toBeNull();
     expect(getMock).toHaveBeenCalledOnce();
     button('Retry')!.click();
     await fixture.whenStable();
     expect(component.errorMessage()).toBe('');
     expect(component.profileLoaded()).toBe(true);
+    expect(element.querySelector('app-verify-status')).not.toBeNull();
+    expect(element.querySelector('app-google-auth')).not.toBeNull();
     expect(getMock).toHaveBeenCalledTimes(3);
     component.startVerification();
     await fixture.whenStable();

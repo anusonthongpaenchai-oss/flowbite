@@ -11,13 +11,20 @@ import { Button } from '../../components/button/button';
 import { EditProfile } from '../../components/userInfo/edit-profile/edit-profile';
 import { ChangImage } from '../../components/userInfo/chang-image/chang-image';
 import { ChangPassword } from '../../components/userInfo/chang-password/chang-password';
+import { LogoutConfirmation } from '../../components/userInfo/logout-confirmation/logout-confirmation';
 
 // api
 import { logout } from '../../../shared/api/auth/logout';
+import { logoutSessions } from '../../../shared/api/auth/logoutSessions';
 import { getUserInfo } from '../../../shared/api/userInfo/userInfo';
-import { clearAuthSession } from '../../../shared/guard/auth';
+import {
+  clearAuthSession,
+  getAuthSession,
+  getRememberedAuthSession,
+  setAuthSession,
+} from '../../../shared/guard/auth';
 @Component({
-  imports: [Button, EditProfile, ChangImage, ChangPassword],
+  imports: [Button, EditProfile, ChangImage, ChangPassword, LogoutConfirmation],
   selector: 'app-user-info',
   host: { class: 'block' },
   templateUrl: './user-info.html',
@@ -34,6 +41,8 @@ export class UserInfo implements OnInit {
   readonly errorMessage = signal('');
   readonly isLoggingOut = signal(false);
   readonly logoutErrorMessage = signal('');
+  readonly isLogoutConfirmationOpen = signal(false);
+  readonly canRemoveRememberedDevices = signal(false);
 
   public isChangeImageProfile = signal<boolean>(false);
   public isChangePassword = signal<boolean>(false);
@@ -200,16 +209,42 @@ export class UserInfo implements OnInit {
     this.pendingTasks.run(() => this.loadUserInfo());
   }
 
-  public async handleLogout(): Promise<void> {
+  public openLogoutConfirmation(): void {
     if (this.isLoggingOut()) {
+      return;
+    }
+
+    this.logoutErrorMessage.set('');
+    // Completed 2FA sessions also have require2FA: false; use the saved 2FA status.
+    const session = getAuthSession();
+    this.canRemoveRememberedDevices.set(
+      session?.twoFaEnabled === true && session.rememberDevice === true,
+    );
+    this.isLogoutConfirmationOpen.set(true);
+  }
+
+  public closeLogoutConfirmation(): void {
+    if (!this.isLoggingOut()) {
+      this.isLogoutConfirmationOpen.set(false);
+    }
+  }
+
+  public async handleLogout(removeRememberedDevices: boolean): Promise<void> {
+    if (this.isLoggingOut() || !this.isLogoutConfirmationOpen()) {
       return;
     }
 
     this.isLoggingOut.set(true);
     this.logoutErrorMessage.set('');
+    const completeTask = this.pendingTasks.add();
 
     try {
-      await logout();
+      if (this.canRemoveRememberedDevices() && removeRememberedDevices) {
+        await logoutSessions();
+      } else {
+        await logout();
+      }
+      this.isLogoutConfirmationOpen.set(false);
       await this.router.navigateByUrl('/', { replaceUrl: true });
     } catch (error) {
       this.logoutErrorMessage.set(
@@ -217,6 +252,7 @@ export class UserInfo implements OnInit {
       );
     } finally {
       this.isLoggingOut.set(false);
+      completeTask();
     }
   }
 
@@ -231,7 +267,20 @@ export class UserInfo implements OnInit {
         throw new Error(response?.message || 'Unable to load your profile. Please try again.');
       }
 
-      const { member, address } = response.data;
+      const { member, address, isTrusted } = response.data;
+      const session = getAuthSession();
+
+      // Trusted logins skip OTP; restore device trust from the server, not the latest form.
+      if (session && session.member.id === member.id && typeof isTrusted === 'boolean') {
+        const twoFaEnabled = isTrusted || session.twoFaEnabled === true;
+        if (session.rememberDevice !== isTrusted || session.twoFaEnabled !== twoFaEnabled) {
+          setAuthSession(
+            { ...session, twoFaEnabled, rememberDevice: isTrusted },
+            getRememberedAuthSession() !== null,
+          );
+        }
+        this.canRemoveRememberedDevices.set(isTrusted);
+      }
 
       this.memberId.set(member.id ?? 0);
       this.imgUrl.set(member.m_image_url ?? '');

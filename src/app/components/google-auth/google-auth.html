@@ -1,0 +1,295 @@
+<article
+  class="flex h-full min-h-[258px] w-full flex-col items-center gap-4 rounded-2xl border border-transparent p-4 text-center"
+  [class]="isEnabled() ? 'bg-[#f3faf7]' : 'bg-[#fffde9]'"
+  aria-labelledby="google-auth-card-title"
+>
+  <img
+    src="svg/icon/brand-google.svg"
+    alt=""
+    aria-hidden="true"
+    class="size-12 shrink-0"
+    [class]="
+      isEnabled()
+        ? '[filter:brightness(0)_saturate(100%)_invert(47%)_sepia(16%)_saturate(2291%)_hue-rotate(109deg)_brightness(100%)_contrast(82%)]'
+        : '[filter:brightness(0)_saturate(100%)_invert(48%)_sepia(92%)_saturate(1760%)_hue-rotate(13deg)_brightness(91%)_contrast(101%)]'
+    "
+  />
+  <h3
+    id="google-auth-card-title"
+    class="min-h-12 w-full shrink-0 text-lg leading-6 font-bold text-black"
+  >
+    Sync with Google<br />Authenticator
+  </h3>
+  <p class="min-h-10 w-full shrink-0 text-sm leading-5 text-gray-500">
+    {{ isEnabled() ? 'Two-Factor Authentication is enabled.' : 'Enable Two-Factor Authentication' }}
+  </p>
+  @if (isEnabled()) {
+    <div
+      role="status"
+      class="mt-auto flex shrink-0 items-center gap-1 rounded-md bg-green-100 px-2.5 py-0.5 text-xs leading-[18px] font-medium text-green-800"
+    >
+      <img src="svg/icon/approve.svg" alt="" aria-hidden="true" class="size-2.5" />
+      <span>Already Verify</span>
+    </div>
+  } @else {
+    <app-button
+      variant="ghost"
+      class="mt-auto min-h-[22px] shrink-0 underline [&_button]:text-yellow-700"
+      (onClick)="openVerification()"
+      >Verify</app-button
+    >
+  }
+</article>
+
+@if (isOpen()) {
+  <dialog
+    #authDialog
+    class="m-auto box-border max-h-[calc(100dvh-24px)] w-[calc(100%-24px)] max-w-[900px] overflow-y-auto rounded-3xl border border-[#e5e7eb] bg-white p-5 text-left font-sans text-[#111928] backdrop:bg-[#1e1e1e]/95 sm:max-h-[calc(100dvh-32px)] sm:w-[calc(100%-32px)] sm:p-12 [&_app-button]:block [&_app-button_button]:min-h-[52px] [&_app-button_button]:rounded-xl [&_app-button_button]:text-base sm:[&_app-button_button]:text-xl [&_app-button_button]:font-medium [&_app-button_button:disabled]:cursor-wait [&_app-button_button:disabled]:opacity-60"
+    aria-labelledby="google-auth-dialog-title"
+    [attr.aria-busy]="isBusy()"
+    (cancel)="onDialogCancel($event)"
+  >
+    <header class="flex items-center gap-3 border-b border-[#f3f4f6] pb-6 sm:gap-6 sm:pb-8">
+      @if (step() !== 'preparation') {
+        <app-button
+          variant="secondary"
+          icon="svg/icon/Vector.svg"
+          class="shrink-0 [&_button]:gap-3 [&_button]:bg-white [&_button]:px-3 sm:[&_button]:px-5 [&_button_img]:size-4"
+          [disabled]="isBusy()"
+          (onClick)="onBack()"
+          >Back</app-button
+        >
+      }
+      <h2
+        id="google-auth-dialog-title"
+        class="min-w-0 flex-1 text-lg leading-tight font-bold sm:text-[30px]"
+      >
+        Sync with Google Authenticator
+      </h2>
+      <button
+        type="button"
+        aria-label="Close Google Authenticator setup"
+        class="grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl border border-gray-200 bg-white hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60 sm:size-[52px]"
+        [disabled]="isBusy()"
+        (click)="closeVerification()"
+      >
+        <img src="svg/icon/x.svg" alt="" aria-hidden="true" class="size-5" />
+      </button>
+    </header>
+
+    @if (step() === 'preparation') {
+      <section class="pt-8" aria-labelledby="google-auth-preparation-title">
+        <img src="svg/icon/brand-google.svg" alt="" aria-hidden="true" class="size-24 sm:size-32" />
+        <h3 id="google-auth-preparation-title" class="mt-7 text-xl leading-8 font-bold sm:text-2xl">
+          Things you need to prepare before verifying
+        </h3>
+        <ul class="mt-7 flex list-none flex-col gap-6 p-0 sm:gap-8">
+          @for (item of preparationItems; track item.icon) {
+            <li class="flex items-center gap-4 sm:gap-6">
+              <span
+                class="grid size-12 shrink-0 place-items-center rounded-xl bg-[#c3ddfd] sm:size-16"
+              >
+                <img [src]="item.icon" alt="" aria-hidden="true" class="size-7 sm:size-9" />
+              </span>
+              <span class="text-base leading-7 font-medium sm:text-[22px]">{{ item.text }}</span>
+            </li>
+          }
+        </ul>
+        @if (errorMessage()) {
+          <p role="alert" class="mt-5 text-sm text-red-600">{{ errorMessage() }}</p>
+        }
+        <app-button class="mt-8 w-full" [disabled]="isBusy()" (onClick)="enableGoogleAuth()">
+          {{ isSubmitting() ? 'Setting up...' : 'Start Verify' }}
+        </app-button>
+      </section>
+    } @else {
+      <nav class="relative mt-8" aria-label="Google Authenticator setup progress">
+        <div
+          class="pointer-events-none absolute inset-x-[16.6667%] top-6 flex h-[3px] sm:top-8"
+          aria-hidden="true"
+        >
+          <span class="flex-1" [class]="stepIndex() >= 2 ? 'bg-[#3f83f8]' : 'bg-[#9ca3af]'"></span>
+          <span class="flex-1" [class]="stepIndex() >= 3 ? 'bg-[#3f83f8]' : 'bg-[#9ca3af]'"></span>
+        </div>
+        <ol class="relative grid grid-cols-3 gap-2">
+          @for (label of ['Setup', 'Verify', 'Complete']; track label; let index = $index) {
+            <li
+              class="flex flex-col items-center gap-3 text-center"
+              [attr.aria-current]="stepIndex() === index + 1 ? 'step' : null"
+            >
+              <span
+                class="grid size-12 place-items-center rounded-full border sm:size-16"
+                [class]="
+                  stepIndex() >= index + 1
+                    ? 'border-[#3f83f8] bg-[#3f83f8]'
+                    : 'border-dashed border-gray-100 bg-white'
+                "
+              >
+                @if (index === 0) {
+                  <img
+                    src="svg/icon/checklist.svg"
+                    alt=""
+                    aria-hidden="true"
+                    class="size-7 sm:size-9"
+                  />
+                } @else if (index === 1) {
+                  <img
+                    src="svg/kyc/message-circle-exclamation.svg"
+                    alt=""
+                    aria-hidden="true"
+                    class="size-7 sm:size-9"
+                    [class]="stepIndex() >= 2 ? 'brightness-0 invert' : ''"
+                  />
+                } @else {
+                  <span
+                    class="mb-1 block h-3 w-6 -rotate-45 border-b-[3px] border-l-[3px] sm:h-4 sm:w-8"
+                    [class]="stepIndex() >= 3 ? 'border-white' : 'border-black'"
+                    aria-hidden="true"
+                  ></span>
+                }
+              </span>
+              <span class="text-sm font-medium sm:text-[22px]">{{ label }}</span>
+            </li>
+          }
+        </ol>
+      </nav>
+
+      @if (step() === 'setup') {
+        <section class="mt-10 sm:mt-14" aria-labelledby="google-auth-qr-title">
+          <h3 id="google-auth-qr-title" class="text-xl font-bold sm:text-2xl">Scan QR Code</h3>
+          <div class="mt-6 flex flex-col items-center gap-6 sm:flex-row sm:gap-8">
+            <qrcode
+              [qrdata]="qrPath()"
+              [width]="224"
+              [margin]="0"
+              [errorCorrectionLevel]="'M'"
+              class="shrink-0"
+              aria-label="Scan with Google Authenticator"
+            ></qrcode>
+            <div class="w-full min-w-0 flex-1">
+              <label for="google-auth-link" class="sr-only">Google Authenticator setup link</label>
+              <input
+                id="google-auth-link"
+                type="text"
+                readonly
+                [value]="qrPath()"
+                (focus)="$any($event.target).select()"
+                class="h-14 w-full min-w-0 rounded-xl border-0 bg-[#f9fafb] px-6 text-base text-gray-500 focus-visible:outline-2 focus-visible:outline-blue-600 sm:text-xl"
+              />
+              <app-button variant="secondary" class="mt-6 w-full" (onClick)="copyLink()"
+                >Copy link</app-button
+              >
+              @if (copyMessage()) {
+                <p role="status" class="mt-2 text-sm text-gray-500">{{ copyMessage() }}</p>
+              }
+            </div>
+          </div>
+          <section
+            class="mt-8 rounded-3xl bg-[#ebf5ff] p-5 sm:p-6"
+            aria-labelledby="google-auth-backup-title"
+          >
+            <h4 id="google-auth-backup-title" class="text-lg font-bold text-black sm:text-[22px]">
+              Save your backup codes
+            </h4>
+            <ul
+              class="mt-7 grid list-none grid-cols-2 gap-3 p-0 min-[480px]:grid-cols-3 min-[800px]:grid-cols-5"
+              aria-label="Backup codes"
+            >
+              @for (code of backupCodes(); track $index) {
+                <li
+                  class="flex min-h-[54px] items-center justify-center rounded-[14px] bg-[#c3ddfd] px-2 py-3"
+                >
+                  <code class="break-all text-center font-sans text-sm text-black sm:text-base">{{
+                    code
+                  }}</code>
+                </li>
+              }
+            </ul>
+            <p class="mt-7 text-base leading-7 text-gray-500 sm:text-lg">
+              Keep these codes safe. You can use them to access your account if you lose your phone
+            </p>
+            <app-button
+              variant="secondary"
+              class="mt-8 w-full [&_button]:bg-white"
+              (onClick)="downloadBackupCodes()"
+              >Download backup codes</app-button
+            >
+          </section>
+          <app-button class="mt-8 w-full" (onClick)="nextStep()">Next</app-button>
+        </section>
+      } @else if (step() === 'verify') {
+        <form
+          class="mt-10 sm:mt-14"
+          (submit)="onVerifySubmit($event)"
+          [attr.aria-busy]="isVerifying()"
+        >
+          <h3 class="text-xl font-bold sm:text-2xl">Enter Verification Code</h3>
+          <p
+            id="google-auth-otp-help"
+            class="mt-7 text-base leading-relaxed text-gray-500 sm:mt-8 sm:text-2xl"
+          >
+            Open Google Authenticator and enter the 6-digit code shown for your account.
+          </p>
+          <div
+            class="mt-8 grid grid-cols-6 gap-2 sm:gap-6"
+            role="group"
+            aria-label="Authenticator code"
+            aria-describedby="google-auth-otp-help"
+          >
+            @for (position of otpPositions; track position) {
+              <input
+                #otpDigit
+                type="text"
+                inputmode="numeric"
+                maxlength="1"
+                pattern="[0-9]"
+                required
+                [attr.autocomplete]="position === 0 ? 'one-time-code' : 'off'"
+                [attr.aria-label]="'Authenticator code digit ' + (position + 1)"
+                [attr.aria-invalid]="errorMessage() ? 'true' : null"
+                [attr.aria-describedby]="errorMessage() ? 'google-auth-error' : null"
+                [value]="otpDigits()[position]"
+                [disabled]="isVerifying()"
+                (focus)="otpDigit.select()"
+                (input)="onOtpInput(position, $event)"
+                (paste)="onOtpPaste(position, $event)"
+                (keydown)="onOtpKeydown(position, $event)"
+                class="h-14 w-full min-w-0 rounded-xl border border-gray-200 bg-white p-0 text-center text-3xl font-bold caret-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60 sm:h-[100px] sm:text-[56px]"
+              />
+            }
+          </div>
+          @if (errorMessage()) {
+            <p id="google-auth-error" role="alert" class="mt-4 text-sm text-red-600">
+              {{ errorMessage() }}
+            </p>
+          }
+          <app-button type="submit" class="mt-8 w-full" [disabled]="!canVerify()">
+            {{ isVerifying() ? 'Verifying...' : 'Verify & Complete Setup' }}
+          </app-button>
+        </form>
+      } @else {
+        <section
+          class="mt-10 border-t border-gray-100 pt-8 text-center sm:mt-14 sm:pt-10"
+          aria-labelledby="google-auth-complete-title"
+          role="status"
+        >
+          <img
+            src="svg/icon/checkup-list.svg"
+            alt=""
+            aria-hidden="true"
+            class="mx-auto size-40 sm:size-60"
+          />
+          <h3 id="google-auth-complete-title" class="mt-7 text-xl font-bold sm:mt-10 sm:text-2xl">
+            Setup Complete!
+          </h3>
+          <p class="mt-6 text-base leading-relaxed text-gray-500 sm:mt-8 sm:text-2xl">
+            TOTP Setup completed successfully
+          </p>
+          <app-button class="mt-8 w-full" routerLink="/user-info" (onClick)="closeVerification()"
+            >Back to homepage</app-button
+          >
+        </section>
+      }
+    }
+  </dialog>
+}

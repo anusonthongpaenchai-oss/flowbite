@@ -60,7 +60,7 @@ describe('UserInfo', () => {
         createdAt: '2026-11-01T00:00:00Z',
         updatedAt: '2026-11-03T00:00:00Z',
       },
-      isTrusted: false,
+      isTrusted: true,
     },
   };
 
@@ -133,6 +133,8 @@ describe('UserInfo', () => {
     clearAuthSession();
     setAuthSession({
       require2FA: false,
+      twoFaEnabled: true,
+      rememberDevice: true,
       member: { ...profile.data.member, m_image_path: '' },
       accessToken: 'test-access-token',
       refreshToken: 'test-refresh-token',
@@ -258,72 +260,293 @@ describe('UserInfo', () => {
     expect(element.querySelector('[role="alert"]')?.textContent).toBe('Unable to connect.');
   });
 
-  it('logs out from the button, clears the session, and opens the login page', async () => {
-    const harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/user-info', AccountLayout);
-    await harness.fixture.whenStable();
-    const router = TestBed.inject(Router);
-    const navigate = vi.spyOn(router, 'navigateByUrl');
-    const button = harness.routeNativeElement!.querySelector<HTMLButtonElement>(
-      'button[aria-label="Logout"]',
-    )!;
+  it('uses normal logout when the server no longer trusts a previously remembered device', async () => {
+    getMock.mockResolvedValueOnce(
+      response({ ...profile, data: { ...profile.data, isTrusted: false } }),
+    );
+    const element = render();
+    await fixture.whenStable();
 
-    expect(button.querySelector('img')?.getAttribute('src')).toBe('svg/icon/logout-2.svg');
-    button.click();
-    await harness.fixture.whenStable();
+    expect(getAuthSession()).toMatchObject({ twoFaEnabled: true, rememberDevice: false });
+    element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!.click();
+    await fixture.whenStable();
+    const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
+    expect(dialog.querySelector('input[type="checkbox"]')).toBeNull();
+    findButton(dialog, 'Logout').click();
+    await fixture.whenStable();
 
     expect(postMock).toHaveBeenCalledExactlyOnceWith(
       '/v1/auth/logout',
       { forgetDevice: false },
       expect.objectContaining({ validateStatus: expect.any(Function) }),
     );
-    expect(getAuthSession()).toBeNull();
-    expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
-    expect(router.url).toBe('/');
-    expect(harness.routeDebugElement!.componentInstance).toBeInstanceOf(Login);
   });
 
-  it('disables logout and ignores repeated clicks until the request completes', async () => {
-    let resolveRequest!: (value: AxiosResponse) => void;
-    postMock.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveRequest = resolve;
-        }),
+  it('restores device removal in an open popup when a trusted profile finishes loading', async () => {
+    let resolveProfile!: (value: AxiosResponse<UserInfoResponse>) => void;
+    getMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveProfile = resolve;
+      }),
     );
+    setAuthSession({ ...getAuthSession()!, twoFaEnabled: undefined, rememberDevice: false });
     const element = render();
+    component.openLogoutConfirmation();
+    fixture.detectChanges();
+    const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
+    expect(dialog.querySelector('input[type="checkbox"]')).toBeNull();
+
+    resolveProfile(response(profile));
     await fixture.whenStable();
 
-    const request = component.handleLogout();
-    fixture.detectChanges();
-    const button = element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!;
-
-    expect(component.isLoggingOut()).toBe(true);
-    expect(button.disabled).toBe(true);
-    expect(button.textContent).toContain('Logging out...');
-    button.click();
-    await component.handleLogout();
-    expect(postMock).toHaveBeenCalledTimes(1);
-    expect(getAuthSession()).not.toBeNull();
-
-    resolveRequest({
-      data: { result: true, message: 'Logged out.' },
-      status: 200,
-    } as AxiosResponse);
-    await request;
-
-    expect(component.isLoggingOut()).toBe(false);
-    expect(getAuthSession()).toBeNull();
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector('input[type="checkbox"]')).not.toBeNull();
+    expect(getAuthSession()).toMatchObject({ twoFaEnabled: true, rememberDevice: true });
+    expect(postMock).not.toHaveBeenCalled();
   });
 
-  it.each(['backend', 'network'])(
-    'shows a logout %s error, keeps the session, and allows retrying',
-    async (failure) => {
+  it.each([
+    { twoFaEnabled: false, rememberDevice: false },
+    { twoFaEnabled: false, rememberDevice: true },
+    { twoFaEnabled: undefined, rememberDevice: true },
+    { twoFaEnabled: true, rememberDevice: false },
+    { twoFaEnabled: true, rememberDevice: undefined },
+  ])(
+    'hides remembered devices and allows cancelling with 2FA=$twoFaEnabled, rememberDevice=$rememberDevice',
+    async ({ twoFaEnabled, rememberDevice }) => {
+      setAuthSession({ ...getAuthSession()!, twoFaEnabled, rememberDevice });
+      getMock.mockResolvedValueOnce(
+        response({ ...profile, data: { ...profile.data, isTrusted: false } }),
+      );
+      const element = render();
+      await fixture.whenStable();
+
+      element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!.click();
+      await fixture.whenStable();
+      const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
+
+      expect(dialog.open).toBe(true);
+      expect(dialog.querySelector('app-checkbox')).toBeNull();
+      expect(dialog.textContent).not.toContain('Remove remembered devices');
+      expect(dialog.textContent).toContain('Are you sure you want to logout?');
+      expect(findButton(dialog, 'Logout')).toBeTruthy();
+      expect(findButton(dialog, 'Cancel')).toBeTruthy();
+      expect(postMock).not.toHaveBeenCalled();
+
+      findButton(dialog, 'Cancel').click();
+      await fixture.whenStable();
+
+      expect(element.querySelector('app-logout-confirmation')).toBeNull();
+      expect(getAuthSession()).not.toBeNull();
+      expect(postMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    'confirms logout with remove remembered devices set to %s, clears the session, and opens Login',
+    async (removeRememberedDevices) => {
+      const harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl('/user-info', AccountLayout);
+      await harness.fixture.whenStable();
+      const router = TestBed.inject(Router);
+      const navigate = vi.spyOn(router, 'navigateByUrl');
+      const button = harness.routeNativeElement!.querySelector<HTMLButtonElement>(
+        'button[aria-label="Logout"]',
+      )!;
+
+      expect(button.querySelector('img')?.getAttribute('src')).toBe('svg/icon/logout-2.svg');
+      button.click();
+      await harness.fixture.whenStable();
+
+      const dialog = harness.routeNativeElement!.querySelector<HTMLDialogElement>(
+        'app-logout-confirmation dialog',
+      )!;
+      const checkbox = dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+      expect(dialog.open).toBe(true);
+      expect(dialog.textContent).toContain('Are you sure you want to logout?');
+      expect(dialog.textContent).toContain('Remove remembered devices (trust for 30 days)');
+      expect(checkbox.checked).toBe(false);
+      expect(postMock).not.toHaveBeenCalled();
+      expect(getAuthSession()).not.toBeNull();
+
+      if (removeRememberedDevices) {
+        checkbox.click();
+        await harness.fixture.whenStable();
+      }
+      findButton(dialog, 'Logout').click();
+      await harness.fixture.whenStable();
+
+      expect(postMock).toHaveBeenCalledExactlyOnceWith(
+        removeRememberedDevices ? '/v1/auth/sessions/logout' : '/v1/auth/logout',
+        removeRememberedDevices ? {} : { forgetDevice: false },
+        expect.objectContaining({ validateStatus: expect.any(Function) }),
+      );
+      expect(getAuthSession()).toBeNull();
+      expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+      expect(router.url).toBe('/');
+      expect(harness.routeDebugElement!.componentInstance).toBeInstanceOf(Login);
+    },
+  );
+
+  it.each([
+    { twoFaEnabled: false, rememberDevice: false },
+    { twoFaEnabled: false, rememberDevice: true },
+    { twoFaEnabled: undefined, rememberDevice: true },
+    { twoFaEnabled: true, rememberDevice: false },
+    { twoFaEnabled: true, rememberDevice: undefined },
+  ])(
+    'uses normal logout without a checkbox with 2FA=$twoFaEnabled, rememberDevice=$rememberDevice',
+    async ({ twoFaEnabled, rememberDevice }) => {
+      setAuthSession({ ...getAuthSession()!, twoFaEnabled, rememberDevice });
+      getMock.mockResolvedValueOnce(
+        response({ ...profile, data: { ...profile.data, isTrusted: false } }),
+      );
+      const element = render();
+      await fixture.whenStable();
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
+
+      element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!.click();
+      await fixture.whenStable();
+      const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
+      expect(dialog.querySelector('input[type="checkbox"]')).toBeNull();
+
+      findButton(dialog, 'Logout').click();
+      await fixture.whenStable();
+
+      expect(postMock).toHaveBeenCalledExactlyOnceWith(
+        '/v1/auth/logout',
+        { forgetDevice: false },
+        expect.objectContaining({ validateStatus: expect.any(Function) }),
+      );
+      expect(getAuthSession()).toBeNull();
+      expect(localStorage.getItem('authSession')).toBeNull();
+      expect(sessionStorage.getItem('authSession')).toBeNull();
+      expect(component.isLogoutConfirmationOpen()).toBe(false);
+      expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+    },
+  );
+
+  it.each(['Cancel', 'Escape'])(
+    'cancels logout using %s and resets the checkbox when reopened',
+    async (action) => {
+      const element = render();
+      await fixture.whenStable();
+      const button = element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!;
+      button.click();
+      await fixture.whenStable();
+      const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
+      dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+      await fixture.whenStable();
+
+      if (action === 'Cancel') {
+        findButton(dialog, 'Cancel').click();
+      } else {
+        dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+      }
+      await fixture.whenStable();
+
+      expect(element.querySelector('app-logout-confirmation')).toBeNull();
+      expect(postMock).not.toHaveBeenCalled();
+      expect(getAuthSession()).not.toBeNull();
+
+      button.click();
+      await fixture.whenStable();
+      expect(
+        element.querySelector<HTMLInputElement>('app-logout-confirmation input')!.checked,
+      ).toBe(false);
+    },
+  );
+
+  it('requires an open confirmation before sending a logout request', async () => {
+    render();
+    await fixture.whenStable();
+
+    await component.handleLogout(false);
+    await component.handleLogout(true);
+
+    expect(postMock).not.toHaveBeenCalled();
+    expect(getAuthSession()).not.toBeNull();
+  });
+
+  it.each([false, true])(
+    'disables controls and prevents duplicate logout requests (%s)',
+    async (removeRememberedDevices) => {
+      let resolveRequest!: (value: AxiosResponse) => void;
+      postMock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRequest = resolve;
+          }),
+      );
+      const element = render();
+      await fixture.whenStable();
+
+      component.openLogoutConfirmation();
+      fixture.detectChanges();
+      const request = component.handleLogout(removeRememberedDevices);
+      fixture.detectChanges();
+      const button = element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!;
+
+      expect(component.isLoggingOut()).toBe(true);
+      expect(button.disabled).toBe(true);
+      expect(button.textContent).toContain('Logging out...');
+      const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
+      expect(
+        Array.from(
+          dialog.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button'),
+        ).every((control) => control.disabled),
+      ).toBe(true);
+      dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+      component.closeLogoutConfirmation();
+      expect(dialog.open).toBe(true);
+      expect(component.isLogoutConfirmationOpen()).toBe(true);
+      button.click();
+      await component.handleLogout(removeRememberedDevices);
+      expect(postMock).toHaveBeenCalledTimes(1);
+      expect(getAuthSession()).not.toBeNull();
+
+      resolveRequest({
+        data: { result: true, message: 'Logged out.' },
+        status: 200,
+      } as AxiosResponse);
+      await request;
+
+      expect(component.isLoggingOut()).toBe(false);
+      expect(getAuthSession()).toBeNull();
+    },
+  );
+
+  it.each([
+    { removeRememberedDevices: false, failure: 'backend' },
+    { removeRememberedDevices: false, failure: 'network' },
+    { removeRememberedDevices: true, failure: 'backend' },
+    { removeRememberedDevices: true, failure: 'network' },
+    { removeRememberedDevices: true, failure: 'http' },
+    { removeRememberedDevices: true, failure: 'malformed' },
+    { removeRememberedDevices: true, failure: 'invalid-json' },
+    { removeRememberedDevices: false, failure: 'backend', rememberDevice: false },
+    { removeRememberedDevices: false, failure: 'network', rememberDevice: false },
+  ])(
+    'keeps the session and allows retrying after a $failure logout error (remove devices: $removeRememberedDevices)',
+    async ({ removeRememberedDevices, failure, rememberDevice = true }) => {
+      setAuthSession({ ...getAuthSession()!, rememberDevice });
+      getMock.mockResolvedValueOnce(
+        response({ ...profile, data: { ...profile.data, isTrusted: rememberDevice } }),
+      );
       if (failure === 'backend') {
         postMock.mockResolvedValueOnce({
           data: { result: false, message: 'Logout rejected.' },
           status: 200,
         } as AxiosResponse);
+      } else if (failure === 'http') {
+        postMock.mockResolvedValueOnce({
+          data: { result: true, error: { message: 'Logout rejected.' } },
+          status: 500,
+        } as AxiosResponse);
+      } else if (failure === 'malformed') {
+        postMock.mockResolvedValueOnce({ data: null, status: 200 } as AxiosResponse);
+      } else if (failure === 'invalid-json') {
+        postMock.mockRejectedValueOnce(new AxiosError('Invalid JSON', AxiosError.ERR_BAD_RESPONSE));
       } else {
         postMock.mockRejectedValueOnce(new Error('Network Error'));
       }
@@ -331,10 +554,28 @@ describe('UserInfo', () => {
       await fixture.whenStable();
       const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
 
-      await component.handleLogout();
+      component.openLogoutConfirmation();
+      fixture.detectChanges();
+      const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
+      if (removeRememberedDevices) {
+        dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+        fixture.detectChanges();
+      }
+      findButton(dialog, 'Logout').click();
+      await fixture.whenStable();
       fixture.detectChanges();
 
-      expect(element.querySelector('[role="alert"]')?.textContent).toMatch(/rejected|connect/);
+      expect(dialog.querySelector('[role="alert"]')?.textContent).toMatch(
+        /rejected|connect|sign out|invalid/,
+      );
+      expect(dialog.open).toBe(true);
+      if (rememberDevice) {
+        expect(dialog.querySelector<HTMLInputElement>('input')!.checked).toBe(
+          removeRememberedDevices,
+        );
+      } else {
+        expect(dialog.querySelector('input[type="checkbox"]')).toBeNull();
+      }
       expect(
         element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!.disabled,
       ).toBe(false);
@@ -342,9 +583,11 @@ describe('UserInfo', () => {
       expect(getAuthSession()).not.toBeNull();
       expect(navigate).not.toHaveBeenCalled();
 
-      await component.handleLogout();
+      findButton(dialog, 'Logout').click();
+      await fixture.whenStable();
 
       expect(component.logoutErrorMessage()).toBe('');
+      expect(component.isLogoutConfirmationOpen()).toBe(false);
       expect(getAuthSession()).toBeNull();
       expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
     },
