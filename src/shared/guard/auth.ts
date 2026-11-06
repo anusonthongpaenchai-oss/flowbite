@@ -1,6 +1,6 @@
 import type { LoginData } from '../api/auth/login';
 
-export type AuthSession = LoginData;
+export type AuthSession = LoginData & { tokenExpiresAt?: number };
 
 export type AuthHeaders = {
   Authorization: string;
@@ -8,6 +8,12 @@ export type AuthHeaders = {
 };
 
 const storageKey = 'authSession';
+const sessionListeners = new Set<() => void>();
+
+export function onAuthSessionChange(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
+}
 
 function isAuthSession(value: unknown): value is AuthSession {
   if (!value || typeof value !== 'object') {
@@ -27,6 +33,10 @@ function isAuthSession(value: unknown): value is AuthSession {
     typeof session.expiresIn === 'number' &&
     Number.isFinite(session.expiresIn) &&
     session.expiresIn > 0 &&
+    (session.tokenExpiresAt === undefined ||
+      (typeof session.tokenExpiresAt === 'number' &&
+        Number.isFinite(session.tokenExpiresAt) &&
+        session.tokenExpiresAt > 0)) &&
     !!session.member &&
     typeof session.member === 'object' &&
     !Array.isArray(session.member)
@@ -43,9 +53,10 @@ export function setAuthSession(session: AuthSession, rememberMe = false): void {
 
   storage.setItem(storageKey, JSON.stringify(session));
   otherStorage.removeItem(storageKey);
+  sessionListeners.forEach((listener) => listener());
 }
 
-export function getAuthSession(): AuthSession | null {
+function readAuthSession(): { session: AuthSession; rememberMe: boolean } | null {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -63,21 +74,26 @@ export function getAuthSession(): AuthSession | null {
 
       try {
         session = JSON.parse(storedSession);
-      } catch {
-        // Discard malformed data and try the other storage.
-      }
+      } catch {}
 
       if (isAuthSession(session)) {
-        return session;
+        return { session, rememberMe: storageName === 'localStorage' };
       }
 
       storage.removeItem(storageKey);
-    } catch {
-      // A browser may disable storage; requests can still proceed without auth.
-    }
+    } catch {}
   }
 
   return null;
+}
+
+export function getAuthSession(): AuthSession | null {
+  return readAuthSession()?.session ?? null;
+}
+
+export function getRememberedAuthSession(): AuthSession | null {
+  const stored = readAuthSession();
+  return stored?.rememberMe ? stored.session : null;
 }
 
 export function clearAuthSession(): void {
@@ -87,12 +103,12 @@ export function clearAuthSession(): void {
 
   window.localStorage.removeItem(storageKey);
   window.sessionStorage.removeItem(storageKey);
+  sessionListeners.forEach((listener) => listener());
 }
 
 export function authGuard(): boolean {
   return getAuthSession() !== null;
 }
-
 export function getAuthHeaders(): AuthHeaders | undefined {
   const session = getAuthSession();
 

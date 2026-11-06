@@ -7,6 +7,7 @@ import { Router } from '@angular/router';
 import { Navbar } from '../../components/navbar/navbar';
 import { login } from '../../../shared/api/auth/login';
 import { setAuthSession } from '../../../shared/guard/auth';
+import { startTokenRefresh } from '../../../shared/services/tokenRefreshScheduler';
 
 @Component({
   imports: [Button, Checkbox, InputComponent, ReactiveFormsModule, Navbar],
@@ -98,7 +99,14 @@ export class Login {
         return;
       }
 
-      setAuthSession(session, rememberMe);
+      setAuthSession(
+        { ...session, tokenExpiresAt: Date.now() + (session.expiresIn ?? 0) * 1000 },
+        rememberMe,
+      );
+
+      if (rememberMe) {
+        startTokenRefresh();
+      }
 
       this.password = '';
       this.loginForm.controls.password.markAsUntouched();
