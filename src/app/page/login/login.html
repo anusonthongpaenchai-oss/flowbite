@@ -60,14 +60,14 @@
           <app-input
             label="Email"
             type="email"
-            [(value)]="email"
+            formControlName="email"
             placeholder="name@example.com"
           ></app-input>
 
           <app-input
             label="Password"
             type="password"
-            [(value)]="password"
+            formControlName="password"
             placeholder="••••••••••"
           ></app-input>
         </div>
@@ -75,11 +75,7 @@
         <div
           class="flex items-center justify-between gap-4 max-[540px]:flex-wrap max-[540px]:gap-3"
         >
-          <app-checkbox
-            label="Remember me"
-            [(checked)]="rememberMe"
-            [disabled]="isSubmitting()"
-          ></app-checkbox>
+          <app-checkbox label="Remember me" formControlName="rememberMe"></app-checkbox>
 
           <app-button variant="ghost" routerLink="/forgot-password">Forgot password?</app-button>
         </div>
@@ -95,10 +91,105 @@
         }
 
         <!-- submit button -->
-        <app-button type="submit" variant="primary" class="w-full" [disabled]="isSubmitting()">{{
-          isSubmitting() ? 'Signing in…' : 'Sign in'
-        }}</app-button>
+        <app-button
+          type="submit"
+          variant="primary"
+          class="w-full"
+          [disabled]="isSubmitting() || !!preAuthToken() || isVerifying()"
+          >{{ isSubmitting() ? 'Signing in…' : 'Sign in' }}</app-button
+        >
       </form>
     </section>
   </main>
 </section>
+
+<dialog
+  #otpDialog
+  aria-labelledby="login-otp-title"
+  aria-describedby="login-otp-help"
+  [attr.aria-busy]="isVerifying()"
+  (cancel)="cancelTwoFa($event)"
+  class="m-auto box-border max-h-[calc(100dvh-24px)] w-[calc(100%-24px)] max-w-[900px] overflow-y-auto rounded-3xl border border-[#e5e7eb] bg-white p-5 text-left font-sans text-[#111928] backdrop:bg-[#1e1e1e]/95 sm:max-h-[calc(100dvh-32px)] sm:w-[calc(100%-32px)] sm:p-12 [&_app-button]:block [&_app-button_button]:min-h-[52px] [&_app-button_button]:rounded-xl [&_app-button_button]:text-base sm:[&_app-button_button]:text-xl [&_app-button_button]:font-medium [&_app-button_button:disabled]:cursor-wait [&_app-button_button:disabled]:opacity-60"
+>
+  <header class="flex items-center gap-3 border-b border-[#f3f4f6] pb-6 sm:gap-6 sm:pb-8">
+    <app-button
+      variant="secondary"
+      icon="svg/icon/Vector.svg"
+      class="shrink-0 [&_button]:gap-3 [&_button]:bg-white [&_button]:px-3 sm:[&_button]:px-5 [&_button_img]:size-4"
+      [disabled]="isVerifying()"
+      (onClick)="cancelTwoFa()"
+      >Back</app-button
+    >
+    <h2 id="login-otp-title" class="min-w-0 flex-1 text-lg leading-tight font-bold sm:text-[30px]">
+      Two-factor authentication
+    </h2>
+    <button
+      type="button"
+      aria-label="Cancel two-factor authentication"
+      class="grid size-11 shrink-0 cursor-pointer place-items-center rounded-xl border border-gray-200 bg-white hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60 sm:size-[52px]"
+      [disabled]="isVerifying()"
+      (click)="cancelTwoFa()"
+    >
+      <img src="svg/icon/x.svg" alt="" aria-hidden="true" class="size-5" />
+    </button>
+  </header>
+
+  <form [formGroup]="otpForm" (ngSubmit)="verifyTwoFa()" class="mt-8 sm:mt-10" novalidate>
+    <div class="flex items-center gap-4 sm:gap-6">
+      <span class="grid size-14 shrink-0 place-items-center rounded-2xl bg-[#ebf5ff] sm:size-20">
+        <img src="svg/icon/brand-google.svg" alt="" aria-hidden="true" class="size-10 sm:size-14" />
+      </span>
+      <div>
+        <h3 class="text-xl font-bold sm:text-2xl">Verify your identity</h3>
+        <p class="mt-1 text-sm leading-6 text-gray-500 sm:text-base">
+          Confirm it’s you to securely sign in to your account.
+        </p>
+      </div>
+    </div>
+    <h3 class="mt-8 text-xl font-bold sm:mt-10 sm:text-2xl">Enter Verification Code</h3>
+    <p id="login-otp-help" class="mt-4 text-base leading-relaxed text-gray-500 sm:text-2xl">
+      Open Google Authenticator and enter the 6-digit code shown for your account.
+    </p>
+    <div
+      class="mt-8 grid grid-cols-6 gap-2 sm:gap-6"
+      role="group"
+      aria-label="Authenticator code"
+      aria-describedby="login-otp-help"
+    >
+      @for (position of otpPositions; track position) {
+        <input
+          #otpDigit
+          type="text"
+          inputmode="numeric"
+          maxlength="1"
+          pattern="[0-9]"
+          [attr.autocomplete]="position === 0 ? 'one-time-code' : 'off'"
+          [attr.aria-label]="'Authenticator code digit ' + (position + 1)"
+          [attr.aria-invalid]="otpError() ? 'true' : null"
+          [attr.aria-describedby]="otpError() ? 'login-otp-error' : null"
+          [value]="otpDigits()[position]"
+          [disabled]="isVerifying()"
+          (focus)="otpDigit.select()"
+          (input)="onOtpInput(position, $event)"
+          (paste)="onOtpPaste(position, $event)"
+          (keydown)="onOtpKeydown(position, $event)"
+          class="h-14 w-full min-w-0 rounded-xl border border-gray-200 bg-white p-0 text-center text-3xl font-bold caret-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-wait disabled:opacity-60 sm:h-[100px] sm:text-[56px]"
+        />
+      }
+    </div>
+
+    @if (otpError()) {
+      <p id="login-otp-error" role="alert" class="mt-4 text-sm text-red-600">{{ otpError() }}</p>
+    }
+
+    <app-checkbox
+      label="Remember this device (30 Days)"
+      formControlName="rememberDevice"
+      class="mt-6 block sm:[&_label_span:last-child]:text-base"
+    ></app-checkbox>
+
+    <app-button type="submit" class="mt-8 w-full" [disabled]="isVerifying()">
+      {{ isVerifying() ? 'Verifying…' : 'Verify & Sign in' }}
+    </app-button>
+  </form>
+</dialog>

@@ -1,6 +1,7 @@
 import type { Routes } from '@angular/router';
 import { AccountPlaceholder } from '../../page/account-placeholder/account-placeholder';
 import { UserInfo } from '../../page/user-info/user-info';
+import { GoogleAuth } from '@components/google-auth/google-auth';
 
 export const accountChildRoutes: Routes = [
   {

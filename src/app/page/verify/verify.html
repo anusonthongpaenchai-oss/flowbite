@@ -1,41 +1,30 @@
 <section class="py-3 text-[#111928]" aria-labelledby="verify-page-title">
   <h2 id="verify-page-title" class="mb-5 text-xl font-semibold">User Verify</h2>
-  @if (isLoading()) {
-    <p
-      role="status"
-      class="rounded-xl border border-gray-200 bg-gray-50 px-5 py-6 text-sm text-gray-500"
+  @if (kycDetail() && !isLoading() && !hasInitialLoadError()) {
+    <div
+      class="grid grid-cols-1 items-stretch gap-4 min-[600px]:grid-cols-2 min-[1000px]:grid-cols-4"
     >
-      Loading KYC data...
-    </p>
-  } @else if (hasInitialLoadError()) {
-    <div class="rounded-xl border border-red-200 bg-red-50 p-5">
-      <p role="alert" class="mb-4 text-sm text-red-700">{{ errorMessage() }}</p>
-      <app-button (click)="loadKyc()" [disabled]="isBusy()">Retry</app-button>
-    </div>
-  } @else if (kycDetail() && !isVerificationOpen()) {
-    @switch (kycDetail()?.data.kyc_stat) {   
-      @case (0) {
-        <app-verify-status variant="pending" [busy]="isBusy()"></app-verify-status>
-      }
-      @case (1) {
-        <app-verify-status variant="approve" [busy]="isBusy()"></app-verify-status>
-      }
-      @case (2) {
+      <div
+        class="min-w-0 [&_app-verify-status>div]:h-full [&_app-verify-status>div]:max-w-none [&_app-verify-status]:h-full"
+      >
         <app-verify-status
-          variant="reject"
+          [variant]="statusVariant()"
           [reason]="kycDetail()?.data.kyc_reason ?? ''"
           [busy]="isBusy()"
           (verifyRequested)="openVerification()"
         ></app-verify-status>
-      }
-      @default {
-        <app-verify-status
-          variant="None"
-          [busy]="isBusy()"
-          (verifyRequested)="openVerification()"
-        ></app-verify-status>
-      }
-    }
+      </div>
+      <app-google-auth
+        [require2fa]="require2fa()"
+        (require2faChange)="onTwoFaEnabled($event)"
+      ></app-google-auth>
+    </div>
+  }
+  @if (hasInitialLoadError()) {
+    <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-5">
+      <p role="alert" class="mb-4 text-sm text-red-700">{{ errorMessage() }}</p>
+      <app-button (click)="loadKyc()" [disabled]="isBusy()">Retry</app-button>
+    </div>
   }
 </section>
 
@@ -60,7 +49,10 @@
           >Back</app-button
         >
       }
-      <h2 id="kyc-dialog-title" class="min-w-0 flex-1 leading-tight text-lg font-bold sm:text-[22px]">
+      <h2
+        id="kyc-dialog-title"
+        class="min-w-0 flex-1 leading-tight text-lg font-bold sm:text-[22px]"
+      >
         KYC Verification
       </h2>
       <button

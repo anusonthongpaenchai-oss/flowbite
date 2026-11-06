@@ -1,0 +1,59 @@
+<dialog
+  #logoutDialog
+  class="m-auto box-border max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-[900px] overflow-y-auto rounded-[32px] border border-[#e5e7eb] bg-white p-6 text-center font-sans text-[#111928] backdrop:bg-black/35 sm:p-12 [&_app-button]:block [&_app-button_button]:min-h-12 [&_app-button_button]:rounded-full [&_app-button_button]:text-lg [&_app-button_button:disabled]:cursor-wait [&_app-button_button:disabled]:opacity-60 sm:[&_app-button_button]:min-h-20 sm:[&_app-button_button]:text-[30px]"
+  aria-labelledby="logout-title"
+  aria-describedby="logout-description"
+  [attr.aria-busy]="isLoggingOut()"
+  (cancel)="onCancel($event)"
+>
+  <div
+    class="mx-auto grid size-20 place-items-center rounded-full bg-[#ffe3d5] sm:size-32"
+    aria-hidden="true"
+  >
+    <img src="svg/icon/logout.svg" alt="" class="size-10 sm:size-16" />
+  </div>
+
+  <h2 id="logout-title" class="mt-6 text-3xl leading-tight font-bold sm:mt-8 sm:text-5xl">
+    Logout
+  </h2>
+  <p
+    id="logout-description"
+    class="mt-6 text-lg leading-normal font-medium text-[#6b7280] sm:mt-10 sm:text-[32px]"
+  >
+    Are you sure you want to logout?
+  </p>
+
+  @if (canRemoveRememberedDevices()) {
+    <app-checkbox
+      class="mt-6 block text-left [&_input]:size-5 [&_input]:cursor-pointer [&_input]:border-2 [&_input]:border-[#808080] [&_input]:bg-white [&_input:checked]:border-blue-600 [&_input:checked]:bg-blue-600 [&_label]:cursor-pointer [&_label]:items-start [&_label]:gap-3 [&_label>span:last-child]:text-base [&_label>span:last-child]:leading-6 [&_label>span:last-child]:font-normal [&_label>span:last-child]:text-[#111928] [&_label>span:first-child]:mt-0.5 [&_svg]:size-5 sm:mt-10 sm:[&_input]:size-6 sm:[&_label]:gap-8 sm:[&_label>span:last-child]:text-[28px] sm:[&_label>span:last-child]:leading-9 sm:[&_label>span:first-child]:mt-1.5 sm:[&_svg]:size-6"
+      label="Remove remembered devices (trust for 30 days)"
+      [checked]="removeRememberedDevices()"
+      [disabled]="isLoggingOut()"
+      (checkedChange)="removeRememberedDevices.set($event)"
+    ></app-checkbox>
+  }
+
+  @if (errorMessage()) {
+    <p role="alert" class="mt-4 text-left text-sm text-red-700 sm:text-base">
+      {{ errorMessage() }}
+    </p>
+  }
+
+  <div class="mt-6 grid gap-4 sm:mt-10 sm:gap-8">
+    <app-button
+      class="[&_button]:bg-linear-to-r [&_button]:from-[#b50000] [&_button]:to-[#5c0000] [&_button:hover]:from-[#9b0000] [&_button:hover]:to-[#480000] [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-4 [&_button:focus-visible]:outline-red-700"
+      [disabled]="isLoggingOut()"
+      (onClick)="confirmed.emit(canRemoveRememberedDevices() && removeRememberedDevices())"
+    >
+      {{ isLoggingOut() ? 'Logging out...' : 'Logout' }}
+    </app-button>
+    <app-button
+      variant="secondary"
+      class="[&_button]:border-2 [&_button]:border-[#e5e7eb] [&_button]:bg-white [&_button]:text-[#9ca3af] [&_button]:shadow-sm [&_button:hover]:bg-gray-50 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-4 [&_button:focus-visible]:outline-gray-500"
+      [disabled]="isLoggingOut()"
+      (onClick)="close()"
+    >
+      Cancel
+    </app-button>
+  </div>
+</dialog>
