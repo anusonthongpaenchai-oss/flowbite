@@ -1,0 +1,79 @@
+<dialog
+  #imageDialog
+  class="m-auto max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-[480px] overflow-y-auto rounded-2xl border border-[#e5e7eb] bg-white p-0 text-left text-sm leading-[1.5] text-[#111928] shadow-[0_12px_32px_#11192826] backdrop:bg-[#11192880]"
+  aria-labelledby="preview-image-title"
+  [attr.aria-busy]="isSaving()"
+  (cancel)="onCancel($event)"
+  (click)="onBackdropClick($event)"
+>
+  <section class="px-6 py-[26px] [@media(max-width:400px)]:p-5">
+    <header class="flex items-center justify-between gap-4">
+      <h2 id="preview-image-title" class="m-0 text-2xl leading-8 font-normal">Preview image</h2>
+      <app-button
+        type="button"
+        class="close-button shrink-0"
+        variant="secondary"
+        icon="svg/icon/Vector.svg"
+        [disabled]="isSaving()"
+        (onClick)="close()"
+      >
+        Back
+      </app-button>
+    </header>
+
+    <div
+      class="mx-auto mt-6 mb-4 aspect-square w-full max-w-[348px] overflow-hidden rounded-full bg-[#f3f4f6]"
+    >
+      @if (previewUrl()) {
+        <img
+          class="block size-full object-cover"
+          [src]="previewUrl()"
+          alt="Profile image preview"
+          (error)="onPreviewError()"
+        />
+      }
+    </div>
+
+    @if (errorMessage()) {
+      <p
+        id="profile-image-error"
+        class="m-0 mb-4 text-sm text-[#b91c1c] [overflow-wrap:anywhere]"
+        role="alert"
+      >
+        {{ errorMessage() }}
+      </p>
+    }
+
+    <div class="flex flex-col gap-4">
+      <button
+        type="button"
+        class="save-button min-h-10 w-full cursor-pointer rounded-full border border-transparent bg-[linear-gradient(100deg,#e89999,#cf8d8d)] px-4 py-[9px] text-sm leading-5 font-medium text-white enabled:hover:brightness-[0.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#1c64f2] disabled:cursor-not-allowed disabled:opacity-60"
+        [disabled]="!selectedFile() || isSaving()"
+        (click)="save()"
+      >
+        {{ isSaving() ? 'Saving…' : 'Save' }}
+      </button>
+      <button
+        type="button"
+        class="upload-button min-h-10 w-full cursor-pointer rounded-full border border-[#e5e7eb] bg-white px-4 py-[9px] text-sm leading-5 font-medium text-[#929db1] shadow-[0_1px_2px_#1119280d] enabled:hover:brightness-[0.96] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#1c64f2] disabled:cursor-not-allowed disabled:opacity-60"
+        aria-describedby="profile-image-help"
+        [disabled]="isSaving()"
+        (click)="imageInput.click()"
+      >
+        Upload another image
+      </button>
+    </div>
+
+    <input
+      #imageInput
+      type="file"
+      name="profileImage"
+      accept=".jpeg,.jpg,.png,image/jpeg,image/png"
+      aria-label="Choose a profile image"
+      [disabled]="isSaving()"
+      (change)="onFileSelected(imageInput)"
+      hidden
+    />
+    <p id="profile-image-help" class="sr-only">Choose a JPEG, JPG or PNG image, up to 5MB.</p>
+  </section>
+</dialog>

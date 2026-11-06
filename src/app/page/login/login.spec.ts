@@ -1,7 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { provideRouter, Router } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import type { AxiosResponse } from 'axios';
 import { api } from '../../../shared/api/api';
 import { Login } from './login';
+import { routes } from '../../app.routes';
+import { UserInfo } from '../user-info/user-info';
+import { stopTokenRefresh } from '../../../shared/services/tokenRefreshScheduler';
 
 describe('Login', () => {
   let component: Login;
@@ -58,6 +64,7 @@ describe('Login', () => {
 
     await TestBed.configureTestingModule({
       imports: [Login],
+      providers: [provideRouter(routes)],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Login);
@@ -66,9 +73,48 @@ describe('Login', () => {
   });
 
   afterEach(() => {
+    stopTokenRefresh();
     localStorage.removeItem('authSession');
     sessionStorage.removeItem('authSession');
     vi.restoreAllMocks();
+  });
+
+  it('navigates to signup when the Sign up button is clicked', async () => {
+    const router = TestBed.inject(Router);
+    const signupButton = fixture.nativeElement.querySelector(
+      'app-button[routerLink="/signup"] button',
+    ) as HTMLButtonElement;
+
+    signupButton.click();
+    await fixture.whenStable();
+
+    expect(router.url).toBe('/signup');
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('does not navigate when a button without routerLink is clicked', async () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl');
+    const button = fixture.nativeElement.querySelector(
+      'app-button[variant="secondary"] button',
+    ) as HTMLButtonElement;
+
+    button.click();
+    await fixture.whenStable();
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('opens forgot password without submitting the sign-in form', async () => {
+    const button = fixture.nativeElement.querySelector(
+      'app-button[routerLink="/forgot-password"] button',
+    ) as HTMLButtonElement;
+
+    button.click();
+    await fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/forgot-password');
+    expect(postMock).not.toHaveBeenCalled();
   });
 
   it('marks invalid fields without requesting a login', async () => {
@@ -130,14 +176,64 @@ describe('Login', () => {
 
       await component.handleSubmit();
 
-      expect(JSON.parse(selectedStorage.getItem('authSession')!)).toEqual(sessionData);
+      expect(JSON.parse(selectedStorage.getItem('authSession')!)).toEqual({
+        ...sessionData,
+        tokenExpiresAt: expect.any(Number),
+      });
       expect(otherStorage.getItem('authSession')).toBeNull();
       expect(selectedStorage.getItem('authSession')).not.toContain('test-password');
       expect(component.password).toBe('');
       expect(component.successMessage()).not.toBe('');
       expect(component.isSubmitting()).toBe(false);
+      expect(TestBed.inject(Router).url).toBe('/user-info');
     },
   );
+
+  it('stores the session before opening the profile page and loading its signals', async () => {
+    postMock.mockResolvedValueOnce(successfulResponse());
+    const getMock = vi.spyOn(api, 'get').mockImplementationOnce(async () => {
+      expect(JSON.parse(sessionStorage.getItem('authSession')!)).toEqual({
+        ...sessionData,
+        tokenExpiresAt: expect.any(Number),
+      });
+      return response({
+        result: true,
+        message: 'Profile retrieved.',
+        data: {
+          member: {
+            ...sessionData.member,
+            m_name: 'Updated Name',
+            m_gender: 'male',
+            m_country: 'Thailand',
+            m_phone: '0812345678',
+          },
+          address: null,
+          isTrusted: false,
+        },
+      });
+    });
+    const harness = await RouterTestingHarness.create();
+    const loginPage = await harness.navigateByUrl('/', Login);
+    loginPage.loginForm.setValue({
+      email: 'member@example.com',
+      password: 'test-password',
+      rememberMe: false,
+    });
+
+    await loginPage.handleSubmit();
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/user-info');
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
+    const profilePage = harness.routeDebugElement!.query(By.directive(UserInfo))
+      .componentInstance as UserInfo;
+    expect(profilePage).toBeInstanceOf(UserInfo);
+    expect(profilePage.firstName()).toBe('Updated Name');
+    expect(profilePage.email()).toBe('member@example.com');
+    expect(harness.routeNativeElement?.querySelector('.profile-name')?.textContent?.trim()).toBe(
+      'Updated Name Member',
+    );
+  });
 
   it('disables submission and ignores duplicate requests while login is pending', async () => {
     let resolveRequest!: (value: AxiosResponse) => void;
@@ -216,6 +312,7 @@ describe('Login', () => {
     expect(component.isSubmitting()).toBe(false);
     expect(localStorage.getItem('authSession')).toBeNull();
     expect(sessionStorage.getItem('authSession')).toBeNull();
+    expect(TestBed.inject(Router).url).toBe('/');
   });
 
   it('does not store an incomplete session from a successful HTTP response', async () => {
@@ -236,4 +333,27 @@ describe('Login', () => {
     expect(localStorage.getItem('authSession')).toBeNull();
     expect(sessionStorage.getItem('authSession')).toBeNull();
   });
+
+  it.each([undefined, '', '   '])(
+    'does not authenticate a login response with an invalid sessionUid (%s)',
+    async (sessionUid) => {
+      postMock.mockResolvedValueOnce(
+        response({
+          result: 'success',
+          message: 'Login successful.',
+          data: { ...sessionData, sessionUid },
+          code: 200,
+        }),
+      );
+      fillForm();
+
+      await component.handleSubmit();
+
+      expect(component.errorMessage()).not.toBe('');
+      expect(component.successMessage()).toBe('');
+      expect(localStorage.getItem('authSession')).toBeNull();
+      expect(sessionStorage.getItem('authSession')).toBeNull();
+      expect(TestBed.inject(Router).url).toBe('/');
+    },
+  );
 });

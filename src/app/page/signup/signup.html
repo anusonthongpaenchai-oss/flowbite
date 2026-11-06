@@ -1,0 +1,191 @@
+<section class="flex min-h-dvh flex-col gap-4 p-4 text-[#111928] max-[540px]:gap-3 max-[540px]:p-3">
+  <!-- navbar -->
+  <app-navbar></app-navbar>
+
+  <!-- main -->
+  <main
+    class="signup-main flex flex-1 items-center rounded-2xl bg-white p-16 [@media(max-width:1100px)]:px-6 [@media(max-width:1100px)]:py-10 [@media(max-width:540px)]:px-4 [@media(max-width:540px)]:py-6"
+  >
+    <form
+      [formGroup]="signupForm"
+      (ngSubmit)="page() < 2 ? next() : handleSubmit()"
+      [attr.aria-busy]="isSubmitting()"
+      class="signup-layout grid w-full grid-cols-[minmax(0,1fr)_minmax(0,512px)] items-center gap-20 [@media(max-width:1100px)]:grid-cols-[minmax(0,512px)] [@media(max-width:1100px)]:justify-center [@media(max-width:1100px)]:gap-8"
+      novalidate
+    >
+      @if (page() === 0) {
+        <article class="signup-terms" aria-labelledby="terms-document-title">
+          <div class="signup-brand mb-8 flex items-center gap-3 text-[24px] font-semibold">
+            <img [src]="logo" alt="" width="32" height="32" />
+            <span>Flowbite</span>
+          </div>
+          <h2 id="terms-document-title" class="mb-2 text-[20px] font-bold">Term &amp; Condition</h2>
+          <div
+            class="signup-terms-copy flex flex-col gap-6 text-[16px] leading-6 text-[#6b7280] [@media(max-width:1100px)]:max-h-80 [@media(max-width:1100px)]:overflow-y-auto"
+            tabindex="0"
+            aria-label="Terms and conditions document"
+          >
+            <p>{{ termAndCondition.firstParagraph }}</p>
+            <p>{{ termAndCondition.secondParagraph }}</p>
+            <p>{{ termAndCondition.thirdParagraph }}</p>
+            <p>{{ termAndCondition.fourthParagraph }}</p>
+          </div>
+        </article>
+      } @else {
+        <div class="signup-illustration [@media(max-width:1100px)]:hidden" aria-hidden="true">
+          <img class="block h-auto w-full" [src]="illustration" alt="" width="768" height="543" />
+        </div>
+      }
+      <section
+        class="signup-card flex min-w-0 flex-col gap-5 rounded-2xl border border-[#f0f1f3] p-8 [@media(max-width:540px)]:px-4 [@media(max-width:540px)]:py-6"
+        aria-labelledby="signup-title"
+      >
+        <app-button
+          class="signup-back self-start"
+          variant="secondary"
+          type="button"
+          icon="svg/icon/Vector.svg"
+          [disabled]="isSubmitting()"
+          (onClick)="back()"
+        >
+          Back
+        </app-button>
+        @switch (page()) {
+          @case (0) {
+            <h1
+              id="signup-title"
+              class="text-[24px] leading-8 font-bold [@media(max-width:540px)]:text-[22px]"
+            >
+              Term &amp; Condition
+            </h1>
+            <app-checkbox
+              [(checked)]="terms"
+              label="I have read and accept all the terms and conditions."
+            ></app-checkbox>
+          }
+          @case (1) {
+            <h1
+              id="signup-title"
+              class="text-[24px] leading-8 font-bold [@media(max-width:540px)]:text-[22px]"
+            >
+              General information
+            </h1>
+            <app-input
+              type="text"
+              label="First name (Eng)*"
+              placeholder="Please input"
+              [(value)]="firstName"
+            ></app-input>
+            <app-input
+              type="text"
+              label="Last name (Eng)*"
+              placeholder="Please input"
+              [(value)]="lastName"
+            ></app-input>
+            <label
+              class="signup-field flex min-w-0 flex-col gap-2 text-[14px] font-medium"
+              for="signup-country"
+            >
+              <span>Country/Region*</span>
+              <span class="signup-select relative">
+                <select
+                  class="w-full appearance-none rounded-lg border border-[#d1d5db] bg-[#f9fafb] py-2.5 pr-10 pl-4 leading-5 focus-visible:outline-offset-1 focus-visible:[outline:2px_solid_#1a56db] [&:has(option:checked[value=''])]:text-[#6b7280]"
+                  id="signup-country"
+                  formControlName="country"
+                  autocomplete="country-name"
+                >
+                  <option value="" disabled>Please input</option>
+                  <option value="Thailand">Thailand</option>
+                  <option value="United Kingdom">United Kingdom</option>
+                  <option value="United States">United States</option>
+                </select>
+                <svg
+                  class="pointer-events-none absolute top-[50%] right-4 [transform:translateY(-50%)]"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="m4 6 4 4 4-4"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+            </label>
+          }
+          @case (2) {
+            <h1
+              id="signup-title"
+              class="text-[24px] leading-8 font-bold [@media(max-width:540px)]:text-[22px]"
+            >
+              Contact &amp; Password
+            </h1>
+            <div class="signup-field flex min-w-0 flex-col gap-2 text-[14px] font-medium">
+              <label for="signup-phone">Phone number*</label>
+              <div
+                class="signup-phone flex overflow-hidden rounded-lg border border-[#d1d5db] bg-[#f9fafb] focus-within:outline-offset-1 focus-within:[outline:2px_solid_#1a56db]"
+              >
+                <span
+                  class="signup-phone-code inline-flex items-center gap-2 border-r border-r-[#d1d5db] bg-[#f3f4f6] px-4 py-2.5 whitespace-nowrap"
+                  aria-label="Phone code: +66"
+                >
+                  <img [src]="countryFlag" alt="" width="16" height="16" />
+                  <span>{{ fixedPhoneCode }}</span>
+                </span>
+                <input
+                  class="w-full min-w-0 px-4 py-2.5 leading-5 [outline:none] placeholder:text-[#6b7280]"
+                  id="signup-phone"
+                  type="tel"
+                  inputmode="numeric"
+                  autocomplete="tel-national"
+                  placeholder="123 4567 890"
+                  formControlName="phoneNumber"
+                  aria-describedby="signup-phone-hint"
+                />
+              </div>
+              <p id="signup-phone-hint" class="signup-hint font-normal text-[#6b7280]">
+                Enter a number between 0 and 9
+              </p>
+            </div>
+            <app-input
+              type="email"
+              label="Email *"
+              placeholder="Please input"
+              [(value)]="email"
+            ></app-input>
+            <app-input
+              type="password"
+              label="Password*"
+              placeholder="Please input"
+              [(value)]="password"
+            ></app-input>
+            <app-input
+              type="password"
+              label="Confirm Password*"
+              placeholder="Please input"
+              [(value)]="confirmPassword"
+            ></app-input>
+          }
+        }
+        @if (errorMessage()) {
+          <p role="alert" class="text-sm text-red-600">{{ errorMessage() }}</p>
+        }
+        @if (successMessage()) {
+          <p role="status" class="text-sm text-green-700">{{ successMessage() }}</p>
+        }
+        @if (page() < 2) {
+          <app-button variant="primary" type="button" (onClick)="next()">Next</app-button>
+        } @else {
+          <app-button variant="primary" type="submit" [disabled]="isSubmitting()">
+            {{ isSubmitting() ? 'Submitting…' : 'Next' }}
+          </app-button>
+        }
+      </section>
+    </form>
+  </main>
+</section>

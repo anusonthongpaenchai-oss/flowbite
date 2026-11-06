@@ -1,0 +1,226 @@
+<section aria-labelledby="information-title" [attr.aria-busy]="isLoading()">
+  <div
+    class="information-header my-2.5 flex items-center justify-between gap-3 min-[1000px]:my-4 [@media(max-width:600px)]:my-4 [@media(max-width:600px)]:flex-col [@media(max-width:600px)]:items-stretch"
+  >
+    <h2 id="information-title" class="text-lg font-bold">Information</h2>
+    <div
+      class="profile-actions flex flex-wrap justify-end gap-[9px] [@media(max-width:600px)]:justify-start [@media(max-width:600px)]:gap-2"
+      aria-label="Profile actions"
+    >
+      <button
+        type="button"
+        class="outline-button inline-flex min-h-[22px] cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[0.8em] leading-[1.4] text-[#111928] focus-visible:outline-offset-3 focus-visible:[outline:2px_solid_#1c64f2] disabled:cursor-wait disabled:opacity-[0.6] min-[1000px]:min-h-8 min-[1000px]:px-3 min-[1000px]:py-1.5 [&:hover:not(:disabled)]:border-[#9ca3af] [&:hover:not(:disabled)]:bg-[#f3f4f6] [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:px-2.5 [@media(max-width:600px)]:py-2 [@media(max-width:600px)]:text-[0.85em]"
+        [disabled]="isLoading() || isUpdating() || !memberId()"
+        (click)="openChangeImageProfile()"
+      >
+        Change image profile
+      </button>
+      <button
+        type="button"
+        class="outline-button inline-flex min-h-[22px] cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[0.8em] leading-[1.4] text-[#111928] focus-visible:outline-offset-3 focus-visible:[outline:2px_solid_#1c64f2] disabled:cursor-wait disabled:opacity-[0.6] min-[1000px]:min-h-8 min-[1000px]:px-3 min-[1000px]:py-1.5 [&:hover:not(:disabled)]:border-[#9ca3af] [&:hover:not(:disabled)]:bg-[#f3f4f6] [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:px-2.5 [@media(max-width:600px)]:py-2 [@media(max-width:600px)]:text-[0.85em]"
+        [disabled]="isLoading() || isUpdating() || !memberId()"
+        (click)="isChangePassword.set(true)"
+      >
+        Change Password
+      </button>
+      <button
+        type="button"
+        class="outline-button inline-flex min-h-[22px] cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[0.8em] leading-[1.4] text-[#111928] focus-visible:outline-offset-3 focus-visible:[outline:2px_solid_#1c64f2] disabled:cursor-wait disabled:opacity-[0.6] min-[1000px]:min-h-8 min-[1000px]:px-3 min-[1000px]:py-1.5 [&:hover:not(:disabled)]:border-[#9ca3af] [&:hover:not(:disabled)]:bg-[#f3f4f6] [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:px-2.5 [@media(max-width:600px)]:py-2 [@media(max-width:600px)]:text-[0.85em]"
+        [disabled]="isLoading() || isUpdating() || !memberId()"
+        (click)="openEditProfile()"
+      >
+        Edit Profile
+      </button>
+      @if (isEditProfile()) {
+        <app-edit-profile
+          [profile]="editProfileData()"
+          [email]="email()"
+          [phoneCode]="phoneCode() || '+66'"
+          [isUpdating]="isUpdating()"
+          [serverError]="updateErrorMessage()"
+          (backEdit)="closeEditProfile()"
+          (updateProfile)="onUpdate($event)"
+        ></app-edit-profile>
+      }
+    </div>
+  </div>
+
+  @if (isChangePassword()) {
+    <app-chang-password
+      (closed)="isChangePassword.set(false)"
+      (passwordChanged)="onPasswordChanged()"
+    ></app-chang-password>
+  }
+
+  @if (isLoading()) {
+    <p role="status" class="mb-2.5 text-gray-500">Loading profile...</p>
+  }
+  @if (errorMessage()) {
+    <p role="alert" class="mb-2.5 text-red-700">{{ errorMessage() }}</p>
+  }
+  @if (logoutErrorMessage()) {
+    <p role="alert" class="mb-2.5 text-red-700">{{ logoutErrorMessage() }}</p>
+  }
+  @if (updateSuccessMessage()) {
+    <p role="status" class="mb-2.5 text-green-700">{{ updateSuccessMessage() }}</p>
+  }
+
+  <div
+    class="information-layout grid grid-cols-[minmax(0,1fr)_minmax(0,2.05fr)] [align-items:start] gap-[9px] min-[1000px]:gap-4 [@media(max-width:600px)]:grid-cols-1 [@media(max-width:600px)]:gap-3"
+  >
+    <aside
+      class="profile-card flex min-w-0 flex-col items-center rounded-xl border border-[#f0f1f3] bg-[#f9fafb] px-3 py-2.5 text-center min-[1000px]:p-4 [@media(max-width:600px)]:p-5"
+      aria-label="Your profile"
+    >
+      @if (imgUrl()) {
+        <img
+          class="profile-avatar size-[clamp(52px,7.5vw,88px)] shrink-0 rounded-full object-cover [@media(max-width:600px)]:size-[72px]"
+          [src]="imgUrl()"
+          [alt]="fullName()"
+          (error)="imgUrl.set('')"
+        />
+      } @else {
+        <div
+          class="profile-avatar avatar-fallback grid size-[clamp(52px,7.5vw,88px)] shrink-0 place-items-center rounded-full bg-[#e1effe] text-[2em] font-semibold text-[#1e429f] object-cover [@media(max-width:600px)]:size-[72px]"
+          role="img"
+          aria-label="Profile photo"
+        >
+          {{ initials() }}
+        </div>
+      }
+      <h2 class="profile-name mt-2 text-[1.05em] font-semibold [overflow-wrap:anywhere]">
+        {{ fullName() }}
+      </h2>
+      <p class="profile-uid mt-0.5 text-[0.85em] text-gray-500">#UID {{ memberId() || '—' }}</p>
+      <button
+        type="button"
+        class="outline-button logout-button mt-2.5 inline-flex min-h-[22px] cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[0.8em] leading-[1.4] text-[#111928] focus-visible:outline-offset-3 focus-visible:[outline:2px_solid_#1c64f2] disabled:cursor-wait disabled:opacity-[0.6] min-[1000px]:min-h-8 min-[1000px]:px-3 min-[1000px]:py-1.5 [&:hover:not(:disabled)]:border-[#9ca3af] [&:hover:not(:disabled)]:bg-[#f3f4f6] [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:px-2.5 [@media(max-width:600px)]:py-2 [@media(max-width:600px)]:text-[0.85em]"
+        aria-label="Logout"
+        [disabled]="isLoggingOut()"
+        (click)="handleLogout()"
+      >
+        <img class="text-sm font-medium" [src]="logoutIcon" alt="" aria-hidden="true" />
+        {{ isLoggingOut() ? 'Logging out...' : 'Logout' }}
+      </button>
+    </aside>
+
+    <div
+      class="details-card min-w-0 rounded-xl border border-[#f0f1f3] bg-[#f9fafb] p-[9px] min-[1000px]:p-4 [@media(max-width:600px)]:px-3 [@media(max-width:600px)]:py-4"
+    >
+      <section
+        class="details-section grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 [@media(max-width:600px)]:grid-cols-1"
+        aria-labelledby="general-title"
+      >
+        <h3 id="general-title" class="text-[1.15em] font-bold">General</h3>
+        <dl
+          class="details-list grid min-w-0 gap-1.5 min-[1000px]:gap-2.5 [@media(max-width:600px)]:gap-3"
+        >
+          <div
+            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+          >
+            <dt class="text-[0.95em] text-[#9ca3af]">First name (Eng)</dt>
+            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+              {{ firstName() || '—' }}
+            </dd>
+          </div>
+          <div
+            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+          >
+            <dt class="text-[0.95em] text-[#9ca3af]">Last name (Eng)</dt>
+            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+              {{ lastName() || '—' }}
+            </dd>
+          </div>
+          <div
+            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+          >
+            <dt class="text-[0.95em] text-[#9ca3af]">Gender</dt>
+            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+              {{ gender() || '—' }}
+            </dd>
+          </div>
+          <div
+            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+          >
+            <dt class="text-[0.95em] text-[#9ca3af]">Country</dt>
+            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+              {{ country() || '—' }}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section
+        class="details-section mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 [@media(max-width:600px)]:mt-6 [@media(max-width:600px)]:grid-cols-1"
+        aria-labelledby="contact-title"
+      >
+        <h3 id="contact-title" class="text-[1.15em] font-bold">Contact</h3>
+        <dl
+          class="details-list grid min-w-0 gap-1.5 min-[1000px]:gap-2.5 [@media(max-width:600px)]:gap-3"
+        >
+          <div
+            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+          >
+            <dt class="text-[0.95em] text-[#9ca3af]">Email</dt>
+            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+              {{ email() || '—' }}
+            </dd>
+          </div>
+          <div
+            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+          >
+            <dt class="text-[0.95em] text-[#9ca3af]">Phone number</dt>
+            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+              {{ formattedPhone() || '—' }}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section
+        class="details-section mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 [@media(max-width:600px)]:mt-6 [@media(max-width:600px)]:grid-cols-1"
+        aria-labelledby="social-title"
+      >
+        <h3 id="social-title" class="text-[1.15em] font-bold">Social</h3>
+        <dl
+          class="details-list grid min-w-0 gap-1.5 min-[1000px]:gap-2.5 [@media(max-width:600px)]:gap-3"
+        >
+          @for (social of socialAccounts; track social.name) {
+            <div
+              class="info-row social-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+            >
+              <dt class="flex items-center gap-3 text-[0.95em] text-[#9ca3af]">
+                <img class="size-[13px] shrink-0" [src]="social.icon" alt="" aria-hidden="true" />
+                {{ social.name }}
+              </dt>
+              <dd
+                class="social-value m-0 flex min-w-0 items-center justify-end gap-3 text-right text-[#111] [overflow-wrap:anywhere]"
+              >
+                <app-button variant="ghost">
+                  <span
+                    [class.text-blue-500]="!social.linked()"
+                    [class.text-red-500]="social.linked()"
+                  >
+                    {{ social.linked() ? 'Unlink' : 'Link' }}
+                  </span>
+                </app-button>
+                <img class="size-3.5 shrink-0" [src]="linkIcon" alt="" aria-hidden="true" />
+              </dd>
+            </div>
+          }
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  @if (isChangeImageProfile()) {
+    <app-chang-image
+      [imageUrl]="imgUrl()"
+      (closed)="isChangeImageProfile.set(false)"
+      (saved)="onImageSaved()"
+    />
+  }
+  <!-- alert -->
+  <!-- alert -->
+  <!-- alert -->
+</section>

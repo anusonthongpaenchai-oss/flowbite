@@ -1,9 +1,10 @@
 import { Component, computed, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
 @Component({
-  imports: [],
+  imports: [RouterLink],
   selector: 'app-button',
   styleUrl: './button.css',
   templateUrl: './button.html',
@@ -13,6 +14,7 @@ export class Button {
   readonly type = input<'button' | 'submit' | 'reset'>('button');
   readonly disabled = input<boolean>(false);
   readonly icon = input<string>('');
+  readonly routerLink = input<string | null>(null);
 
   protected readonly buttonClasses = computed(() => {
     const base = 'w-full rounded-lg cursor-pointer flex justify-center items-center gap-2';
