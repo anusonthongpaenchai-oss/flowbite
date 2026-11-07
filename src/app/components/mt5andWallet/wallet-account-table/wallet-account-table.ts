@@ -1,5 +1,5 @@
 import { CurrencyPipe, TitleCasePipe } from '@angular/common';
-import { Component, input } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import type { WalletAccount } from '../../../page/mt5-wallet/wallet-account';
 
 @Component({
@@ -10,4 +10,5 @@ import type { WalletAccount } from '../../../page/mt5-wallet/wallet-account';
 })
 export class WalletAccountTable {
   readonly accounts = input.required<readonly WalletAccount[]>();
+  readonly detailsRequested = output<string>();
 }

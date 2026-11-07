@@ -75,8 +75,8 @@
     >
       <div class="balance-row flex items-center justify-between gap-2 text-gray-500">
         <span>Available Balance</span
-        ><strong class="text-[22px] font-bold whitespace-nowrap text-[#1c64f2]">{{
-          activePage() === 'wallet' ? '—' : '$ 3,000'
+        ><strong class="min-w-0 text-right text-[22px] font-bold wrap-break-word text-[#1c64f2]">{{
+          availableBalance | currency: 'USD' : 'symbol' : '1.0-2'
         }}</strong>
       </div>
       <span

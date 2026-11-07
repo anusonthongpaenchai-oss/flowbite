@@ -1,21 +1,21 @@
-import { DecimalPipe, TitleCasePipe } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
-import { getAllWallet } from '../../../shared/api/wallet/getAllWallet';
+import { TitleCasePipe } from '@angular/common';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Button } from '../../components/ui/button/button';
+import { CardWallet } from '../../components/mt5andWallet/card-wallet/card-wallet';
 import {
   CreateAccount,
   type WalletMode,
 } from '../../components/mt5andWallet/create-account/create-account';
 import { WalletAccountCard } from '../../components/mt5andWallet/wallet-account-card/wallet-account-card';
 import { WalletAccountTable } from '../../components/mt5andWallet/wallet-account-table/wallet-account-table';
-import { toWalletAccount, type WalletAccount } from './wallet-account';
+import { WalletAccounts } from './wallet-accounts';
 
 @Component({
   selector: 'app-mt5-wallet',
   imports: [
     Button,
+    CardWallet,
     CreateAccount,
-    DecimalPipe,
     TitleCasePipe,
     WalletAccountCard,
     WalletAccountTable,
@@ -23,16 +23,20 @@ import { toWalletAccount, type WalletAccount } from './wallet-account';
   templateUrl: './mt5-wallet.html',
 })
 export class Mt5Wallet {
+  private readonly walletAccounts = inject(WalletAccounts);
+
   protected readonly views = [
     { key: 'grid', label: 'Grid View', icon: 'svg/sidebar/layout-dashboard.svg' },
     { key: 'table', label: 'Table View', icon: 'svg/icon/list.svg' },
   ] as const;
   protected readonly activeTab = signal<string | null>(null);
   protected readonly view = signal<'grid' | 'table'>('grid');
-  protected readonly loadState = signal<'loading' | 'ready' | 'error'>('loading');
+  protected readonly loadState = this.walletAccounts.loadState;
   protected readonly accountMode = signal<WalletMode | null>(null);
+  protected readonly selectedAccountNumber = signal<string | null>(null);
   protected readonly accountCreated = signal(false);
-  private readonly accounts = signal<WalletAccount[]>([]);
+  private readonly accounts = this.walletAccounts.accounts;
+  protected readonly walletBalanceLabel = this.walletAccounts.balanceLabel;
 
   protected readonly tabs = computed(() => {
     const tradingTypes = this.accounts()
@@ -46,16 +50,6 @@ export class Mt5Wallet {
     return tab === null
       ? this.accounts()
       : this.accounts().filter(({ tradingType }) => tradingType === tab);
-  });
-
-  protected readonly walletBalance = computed(() => {
-    let total = 0;
-    for (const account of this.accounts()) {
-      if (!account.isActiveMainWallet) continue;
-      if (account.balance === null) return null;
-      total += account.balance;
-    }
-    return total;
   });
 
   constructor() {
@@ -79,18 +73,7 @@ export class Mt5Wallet {
     void this.loadAccounts();
   }
 
-  protected async loadAccounts(): Promise<void> {
-    this.loadState.set('loading');
-    try {
-      const response = await getAllWallet();
-      if (!response.result || !Array.isArray(response.data)) {
-        this.loadState.set('error');
-        return;
-      }
-      this.accounts.set(response.data.map(toWalletAccount));
-      this.loadState.set('ready');
-    } catch {
-      this.loadState.set('error');
-    }
+  protected loadAccounts(): Promise<void> {
+    return this.walletAccounts.load();
   }
 }

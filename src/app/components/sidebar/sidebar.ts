@@ -1,4 +1,4 @@
-import { NgTemplateOutlet } from '@angular/common';
+import { CurrencyPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { Member } from '../../../shared/api/auth/login';
@@ -15,12 +15,13 @@ type SidebarItem = {
 
 @Component({
   selector: 'app-sidebar',
-  imports: [NgTemplateOutlet, RouterLink],
+  imports: [CurrencyPipe, NgTemplateOutlet, RouterLink],
   host: { class: 'block h-full min-h-0' },
   templateUrl: './sidebar.html',
 })
 export class Sidebar {
   readonly member = input<Member | null>(null);
+  readonly availableBalance = 3000;
   readonly collapsed = input(false);
   readonly mobile = input(false);
   readonly activePage = input<PortalPage>('dashboard');

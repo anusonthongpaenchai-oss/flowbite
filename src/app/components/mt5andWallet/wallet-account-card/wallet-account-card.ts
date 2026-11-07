@@ -1,5 +1,5 @@
 import { CurrencyPipe, TitleCasePipe } from '@angular/common';
-import { Component, input } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import { Button } from '../../ui/button/button';
 import type { WalletAccount } from '../../../page/mt5-wallet/wallet-account';
 
@@ -11,4 +11,13 @@ import type { WalletAccount } from '../../../page/mt5-wallet/wallet-account';
 })
 export class WalletAccountCard {
   readonly account = input.required<WalletAccount>();
+  readonly detailsRequested = output<string>();
+  protected readonly hasAccountNumber = computed(() => {
+    const number = this.account().number.trim();
+    return !!number && number !== '—';
+  });
+
+  protected openDetails(): void {
+    if (this.hasAccountNumber()) this.detailsRequested.emit(this.account().number.trim());
+  }
 }

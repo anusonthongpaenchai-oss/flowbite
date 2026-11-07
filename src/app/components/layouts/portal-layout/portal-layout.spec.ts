@@ -70,7 +70,9 @@ describe('PortalLayout and protected routes', () => {
           data:
             url === '/v1/verify/kyc'
               ? { result: true, data: { kyc_stat: 1 } }
-              : { result: true, data: { member, address: null, isTrusted: false } },
+              : url === '/v1/trading'
+                ? { result: true, data: [] }
+                : { result: true, data: { member, address: null, isTrusted: false } },
         }) as AxiosResponse,
     );
     vi.spyOn(api, 'get').mockImplementation(getMock);
@@ -323,9 +325,9 @@ describe('PortalLayout and protected routes', () => {
     expect(TestBed.inject(Router).url).toBe('/mt5-wallet');
     expect(link!.getAttribute('aria-current')).toBe('page');
     expect(element.querySelector('.navbar-title')?.textContent).toContain('MT5 & Wallet');
-    expect(element.textContent).toContain('250.50 USD');
-    expect(element.querySelector('.balance-summary')?.textContent).not.toContain('$ 3,000');
     const walletPage = element.querySelector('app-mt5-wallet')!;
+    expect(walletPage.textContent).toContain('250.50 USD');
+    expect(element.querySelector('.balance-summary strong')?.textContent?.trim()).toBe('$3,000');
     const tabButtons = walletPage.querySelectorAll('[aria-label="Account type"] button');
     expect([...tabButtons].map((button) => button.textContent?.trim())).toEqual([
       'All',
@@ -373,7 +375,101 @@ describe('PortalLayout and protected routes', () => {
     expect(table.textContent).not.toContain('Live Alpha');
     await click('All');
     expect(table.tBodies[0].rows).toHaveLength(8);
-    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
+    expect(getMock.mock.calls.map(([url]) => url)).toEqual(['/v1/trading', '/v1/trading']);
+  });
+
+  it('opens wallet details by account number and reveals each password only on request', async () => {
+    const wallet = {
+      id: 7,
+      wallet_account_no: '000738475',
+      wallet_account_name: 'Trading account',
+      wallet_type: 'trading',
+      wallet_trading_type: 'live',
+      wallet_account_type: 4,
+      member_id: 14966,
+      wallet_balance: 98000.07,
+      wallet_currency: 'USC',
+      wallet_master_password: 'master-example',
+      wallet_investor_password: 'investor-example',
+      wallet_credit: 5,
+      wallet_equity: 98000,
+      wallet_margin: 12.5,
+      wallet_leverage: 1000,
+    };
+    getMock
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { result: true, data: [wallet] },
+      } as AxiosResponse)
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { result: true, data: { wallet } },
+      } as AxiosResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+    page.querySelector<HTMLElement>('article')!.click();
+    await harness.fixture.whenStable();
+
+    expect(getMock).toHaveBeenLastCalledWith('/v1/wallet/user/000738475', expect.anything());
+    const dialog = page.querySelector<HTMLDialogElement>('app-card-wallet dialog')!;
+    expect(dialog.open).toBe(true);
+    await vi.waitFor(() => expect(dialog.textContent).toContain('#14966'));
+    for (const value of ['Test Member', '#14966', '98,000.07', '12.50', '1:1000', 'USC']) {
+      expect(dialog.textContent).toContain(value);
+    }
+    expect(dialog.textContent).not.toContain('master-example');
+    expect(dialog.textContent).not.toContain('investor-example');
+    const reveal = (label: string) =>
+      dialog.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
+    reveal('Show master password');
+    await harness.fixture.whenStable();
+    expect(dialog.textContent).toContain('master-example');
+    expect(dialog.textContent).not.toContain('investor-example');
+    reveal('Hide master password');
+    reveal('Show investor password');
+    await harness.fixture.whenStable();
+    expect(dialog.textContent).not.toContain('master-example');
+    expect(dialog.textContent).toContain('investor-example');
+    for (const label of ['Deposit', 'Withdraw/Transfer', 'Transaction History']) {
+      const button = [...dialog.querySelectorAll('button')].find(
+        (item) => item.textContent?.trim() === label,
+      );
+      expect(button?.disabled).toBe(true);
+    }
+    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+    await harness.fixture.whenStable();
+    expect(page.querySelector('app-card-wallet')).toBeNull();
+  });
+
+  it('opens the existing wallet detail dialog for the selected table row', async () => {
+    const first = { id: 1, wallet_account_no: '0001', wallet_account_name: 'First account' };
+    const selected = { id: 2, wallet_account_no: '0002', wallet_account_name: 'Second account' };
+    getMock
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { result: true, data: [first, selected] },
+      } as AxiosResponse)
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { result: true, data: { wallet: { ...selected, member_id: 14966 } } },
+      } as AxiosResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    [...page.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Table View')!
+      .click();
+
+    const rows = () => page.querySelectorAll<HTMLTableRowElement>('tbody tr');
+    await vi.waitFor(() => expect(rows()).toHaveLength(2));
+    rows()[1].click();
+
+    await vi.waitFor(() => {
+      expect(getMock).toHaveBeenLastCalledWith('/v1/wallet/user/0002', expect.anything());
+      const dialog = page.querySelector<HTMLDialogElement>('app-card-wallet dialog');
+      expect(dialog?.open).toBe(true);
+      expect(dialog?.textContent).toContain('#14966');
+    });
   });
 
   it('can retry a failed wallet request and displays an empty result', async () => {
@@ -448,6 +544,9 @@ describe('PortalLayout and protected routes', () => {
   });
 
   it('opens Dashboard with the shared navbar from / when a session already exists', async () => {
+    getMock.mockResolvedValueOnce({
+      data: { result: true, data: [{ id: 1, wallet_type: 'main', wallet_balance: 420 }] },
+    } as AxiosResponse);
     await open('/');
     const element = harness.routeNativeElement!;
     expect(TestBed.inject(Router).url).toBe('/dashboard');
@@ -464,7 +563,8 @@ describe('PortalLayout and protected routes', () => {
     expect(element.querySelector('.user-email')?.textContent?.trim()).toBe(member.email);
     expect(element.querySelectorAll('.navigation-item:disabled')).toHaveLength(11);
     expect(element.querySelectorAll('nav[aria-label="Sidebar"] a')).toHaveLength(3);
-    expect(getMock).not.toHaveBeenCalled();
+    expect(element.querySelector('.balance-summary strong')?.textContent?.trim()).toBe('$3,000');
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
   it.each(protectedUrls.slice(1))(
@@ -500,7 +600,7 @@ describe('PortalLayout and protected routes', () => {
     element.querySelector<HTMLAnchorElement>('a[aria-label="Dashboard"]')!.click();
     await harness.fixture.whenStable();
     expect(TestBed.inject(Router).url).toBe('/dashboard');
-    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
+    expect(getMock.mock.calls.map(([url]) => url)).toEqual(['/v1/trading', '/v1/member/profile']);
   });
 
   it('checks child routes again when the session has been removed', async () => {
@@ -508,7 +608,7 @@ describe('PortalLayout and protected routes', () => {
     sessionStorage.removeItem('authSession');
     await harness.navigateByUrl('/user-info/crypto-wallet', Login);
     expect(TestBed.inject(Router).url).toBe('/');
-    expect(getMock).not.toHaveBeenCalled();
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
   it('removes private content on logout and blocks subsequent direct visits', async () => {

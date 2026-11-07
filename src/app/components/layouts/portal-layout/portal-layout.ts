@@ -13,16 +13,19 @@ import { Sidebar, type PortalPage } from '../../sidebar/sidebar';
 import { Navbar } from '../../navbar/navbar';
 import { Button } from '../../ui/button/button';
 import { getAuthSession, onAuthSessionChange } from '../../../../shared/guard/auth';
+import { WalletAccounts } from '../../../page/mt5-wallet/wallet-accounts';
 
 @Component({
   selector: 'app-portal-layout',
   imports: [RouterLink, RouterOutlet, Sidebar, Navbar, Button],
+  providers: [WalletAccounts],
   host: { class: 'block min-h-dvh bg-[#f9fafb] text-[#111928]' },
   templateUrl: './portal-layout.html',
 })
 export class PortalLayout {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly walletAccounts = inject(WalletAccounts);
   private readonly desktopQuery = window.matchMedia?.('(min-width: 1024px)');
   private readonly drawer = viewChild<ElementRef<HTMLDialogElement>>('drawer');
   private readonly menuButton = viewChild<ElementRef<HTMLButtonElement>>('menuButton');
@@ -43,8 +46,14 @@ export class PortalLayout {
 
   constructor() {
     const synchronize = () => {
-      this.session.set(getAuthSession());
-      if (!this.session()) {
+      const previousMemberId = this.session()?.member.id;
+      const session = getAuthSession();
+      this.session.set(session);
+      if (session?.member.id !== previousMemberId) {
+        this.walletAccounts.reset();
+        if (session) void this.walletAccounts.load();
+      }
+      if (!session) {
         this.closeDrawer();
         void this.router.navigateByUrl('/', { replaceUrl: true });
       }
@@ -68,6 +77,9 @@ export class PortalLayout {
       if (event instanceof NavigationEnd) {
         this.activePage.set(this.pageFor(event.urlAfterRedirects));
         this.closeDrawer();
+        if (this.session() && this.walletAccounts.loadState() === 'idle') {
+          void this.walletAccounts.load();
+        }
       }
     });
   }

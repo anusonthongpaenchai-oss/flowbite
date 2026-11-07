@@ -10,12 +10,7 @@
         class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-gray-50 px-3 text-sm tabular-nums"
       >
         <img src="svg/icon/wallet.svg" alt="" width="18" height="18" />
-        @let balance = walletBalance();
-        @if (loadState() === 'ready' && balance !== null) {
-          {{ balance | number: (balance % 1 === 0 ? '1.0-0' : '1.2-2') }} USD
-        } @else {
-          — USD
-        }
+        {{ walletBalanceLabel() }}
       </span>
     </div>
 
@@ -107,15 +102,25 @@
       <div class="@container">
         <div class="grid grid-cols-1 gap-4 @min-[520px]:grid-cols-2 @min-[780px]:grid-cols-3">
           @for (account of visibleAccounts(); track account.id) {
-            <app-wallet-account-card [account]="account" />
+            <app-wallet-account-card
+              [account]="account"
+              (detailsRequested)="selectedAccountNumber.set($event)"
+            />
           }
         </div>
       </div>
     } @else {
-      <app-wallet-account-table [accounts]="visibleAccounts()" />
+      <app-wallet-account-table
+        [accounts]="visibleAccounts()"
+        (detailsRequested)="selectedAccountNumber.set($event)"
+      />
     }
   </div>
 </section>
+
+@if (selectedAccountNumber(); as accountNumber) {
+  <app-card-wallet [accountNumber]="accountNumber" (closed)="selectedAccountNumber.set(null)" />
+}
 
 @if (accountMode(); as mode) {
   <app-create-account
