@@ -1,0 +1,12 @@
+.select-field::after {
+  position: absolute;
+  inset-inline-end: 1rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-75%) rotate(45deg);
+  pointer-events: none;
+  content: '';
+}

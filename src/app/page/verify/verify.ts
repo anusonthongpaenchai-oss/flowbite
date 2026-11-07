@@ -36,10 +36,10 @@ import {
   getRememberedAuthSession,
   setAuthSession,
 } from '../../../shared/guard/auth';
-import { InputComponent } from '../../components/input/input';
-import { Button } from '../../components/button/button';
-import { Verify as VerifyStatus } from '../../components/verify/verify';
-import { GoogleAuth } from '../../components/google-auth/google-auth';
+import { InputComponent } from '../../components/ui/input/input';
+import { Button } from '../../components/ui/button/button';
+import { Verify as VerifyStatus } from '../../components/userAccount/verify/verify';
+import { GoogleAuth } from '../../components/userAccount/google-auth/google-auth';
 
 type VerifyStep = 'profile' | 'otp' | 'id-proof';
 type OtpMethod = 'sms' | 'email';
