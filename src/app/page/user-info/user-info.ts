@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, PendingTasks, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import type { Member } from '../../../shared/api/auth/login';
 import {
   normalizeProfileUpdateRequest,
   profileUpdate,
@@ -7,11 +8,11 @@ import {
 } from '../../../shared/api/userInfo/profileUpdate';
 
 // components
-import { Button } from '../../components/button/button';
-import { EditProfile } from '../../components/userInfo/edit-profile/edit-profile';
-import { ChangImage } from '../../components/userInfo/chang-image/chang-image';
-import { ChangPassword } from '../../components/userInfo/chang-password/chang-password';
-import { LogoutConfirmation } from '../../components/userInfo/logout-confirmation/logout-confirmation';
+import { Button } from '../../components/ui/button/button';
+import { EditProfile } from '../../components/userAccount/userInfo/edit-profile/edit-profile';
+import { ChangImage } from '../../components/userAccount/userInfo/chang-image/chang-image';
+import { ChangPassword } from '../../components/userAccount/userInfo/chang-password/chang-password';
+import { LogoutConfirmation } from '../../components/userAccount/userInfo/logout-confirmation/logout-confirmation';
 
 // api
 import { logout } from '../../../shared/api/auth/logout';
@@ -191,6 +192,11 @@ export class UserInfo implements OnInit {
       this.district.set(update.address.address_city);
       this.province.set(update.address.address_state);
       this.zipCode.set(update.address.address_zipcode);
+      this.synchronizeSessionMember({
+        id: this.memberId(),
+        m_name: update.member.m_name,
+        m_lastname: update.member.m_lastname,
+      });
 
       this.isEditProfile.set(false);
       this.updateSuccessMessage.set(response.message);
@@ -268,19 +274,16 @@ export class UserInfo implements OnInit {
       }
 
       const { member, address, isTrusted } = response.data;
-      const session = getAuthSession();
-
-      // Trusted logins skip OTP; restore device trust from the server, not the latest form.
-      if (session && session.member.id === member.id && typeof isTrusted === 'boolean') {
-        const twoFaEnabled = isTrusted || session.twoFaEnabled === true;
-        if (session.rememberDevice !== isTrusted || session.twoFaEnabled !== twoFaEnabled) {
-          setAuthSession(
-            { ...session, twoFaEnabled, rememberDevice: isTrusted },
-            getRememberedAuthSession() !== null,
-          );
-        }
-        this.canRemoveRememberedDevices.set(isTrusted);
-      }
+      this.synchronizeSessionMember(
+        {
+          id: member.id,
+          m_name: member.m_name,
+          m_lastname: member.m_lastname,
+          m_image_url: member.m_image_url,
+          email: member.email,
+        },
+        isTrusted,
+      );
 
       this.memberId.set(member.id ?? 0);
       this.imgUrl.set(member.m_image_url ?? '');
@@ -304,6 +307,25 @@ export class UserInfo implements OnInit {
       );
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  private synchronizeSessionMember(
+    member: Partial<Member> & { id: number },
+    isTrusted?: boolean,
+  ): void {
+    const session = getAuthSession();
+    if (!session || session.member.id !== member.id) return;
+
+    const nextSession = { ...session, member: { ...session.member, ...member } };
+    // Trusted logins skip OTP; retain the server's trust status when updating the profile.
+    if (typeof isTrusted === 'boolean') {
+      nextSession.twoFaEnabled = isTrusted || session.twoFaEnabled === true;
+      nextSession.rememberDevice = isTrusted;
+      this.canRemoveRememberedDevices.set(isTrusted);
+    }
+    if (JSON.stringify(nextSession) !== JSON.stringify(session)) {
+      setAuthSession(nextSession, getRememberedAuthSession() !== null);
     }
   }
 }

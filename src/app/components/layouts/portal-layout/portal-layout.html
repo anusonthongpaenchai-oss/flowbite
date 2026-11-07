@@ -1,0 +1,88 @@
+<div
+  class="portal-page mx-auto flex min-h-dvh max-w-[1600px] flex-col items-start gap-3 p-3 lg:grid lg:grid-cols-[272px_minmax(0,1fr)] lg:gap-4 lg:p-4 lg:[&.sidebar-collapsed]:grid-cols-[72px_minmax(0,1fr)]"
+  [class.sidebar-collapsed]="collapsed() && desktop()"
+>
+  @if (desktop()) {
+    <aside
+      class="desktop-sidebar sticky top-4 h-[calc(100dvh-32px)] min-h-0"
+      aria-label="Main navigation"
+    >
+      <app-sidebar
+        [member]="session()?.member ?? null"
+        [collapsed]="collapsed()"
+        [activePage]="activePage()"
+        (toggleRequested)="collapsed.set(!collapsed())"
+      />
+    </aside>
+  } @else {
+    <dialog
+      #drawer
+      id="navigation-drawer"
+      class="navigation-drawer fixed inset-y-0 right-auto left-0 m-0 h-dvh max-h-dvh w-[min(304px,calc(100vw-32px))] max-w-none border-0 bg-[#f9fafb] p-3 text-[#111928] backdrop:bg-[#111928]/40"
+      aria-label="Main navigation"
+      (cancel)="cancelDrawer($event)"
+      (click)="onBackdropClick($event)"
+    >
+      <app-sidebar
+        [member]="session()?.member ?? null"
+        [mobile]="true"
+        [activePage]="activePage()"
+        (toggleRequested)="closeDrawer()"
+        (navigated)="closeDrawer()"
+      />
+    </dialog>
+  }
+  <div
+    class="portal-content flex min-h-[calc(100dvh-24px)] min-w-0 w-full flex-1 flex-col lg:min-h-[calc(100dvh-32px)]"
+  >
+    <app-navbar
+      class="portal-navbar shrink-0 [&>header]:border [&>header]:border-[#f0f1f3]"
+      [pageTitle]="pageTitle()"
+      [showLanguage]="activePage() !== 'wallet'"
+    >
+      @if (!desktop()) {
+        <button
+          navbar-leading
+          #menuButton
+          type="button"
+          class="menu-button grid size-10 shrink-0 cursor-pointer place-items-center rounded-[10px] border border-gray-200 bg-white focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#1c64f2]"
+          aria-label="Open navigation"
+          aria-controls="navigation-drawer"
+          [attr.aria-expanded]="drawerOpen()"
+          (click)="openDrawer()"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M4 6h16M4 12h16M4 18h16"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      }
+      @if (activePage() === 'account') {
+        <a
+          navbar-actions
+          routerLink="/hello"
+          class="deposit-button rounded-md bg-[linear-gradient(110deg,#0A136A,#00D4FC)] px-3 py-2 text-xs font-medium text-white no-underline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#1c64f2] hover:brightness-110"
+          >Deposit</a
+        >
+      }
+      @if (activePage() === 'wallet') {
+        <app-button
+          navbar-actions
+          class="deposit-button"
+          variant="gradient"
+          size="compact"
+          [disabled]="true"
+        >
+          Deposit
+        </app-button>
+      }
+    </app-navbar>
+    <div class="route-content mt-3 min-h-0 flex-1 lg:mt-4">
+      <router-outlet />
+    </div>
+  </div>
+</div>

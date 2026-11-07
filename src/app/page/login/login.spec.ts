@@ -239,11 +239,11 @@ describe('Login', () => {
       expect(component.password).toBe('');
       expect(component.successMessage()).not.toBe('');
       expect(component.isSubmitting()).toBe(false);
-      expect(TestBed.inject(Router).url).toBe('/user-info');
+      expect(TestBed.inject(Router).url).toBe('/dashboard');
     },
   );
 
-  it('stores the session before opening the profile page and loading its signals', async () => {
+  it('opens Dashboard with its shared navbar before loading the profile from User Account', async () => {
     postMock.mockResolvedValueOnce(successfulResponse());
     const getMock = vi.spyOn(api, 'get').mockImplementationOnce(async () => {
       expect(JSON.parse(sessionStorage.getItem('authSession')!)).toEqual({
@@ -278,6 +278,16 @@ describe('Login', () => {
     await loginPage.handleSubmit();
     await harness.fixture.whenStable();
 
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
+    expect(getMock).not.toHaveBeenCalled();
+    expect(harness.routeNativeElement!.querySelector('app-dashboard')).not.toBeNull();
+    expect(harness.routeNativeElement!.querySelector('.navbar-title')?.textContent?.trim()).toBe(
+      'Dashboard',
+    );
+    harness
+      .routeNativeElement!.querySelector<HTMLAnchorElement>('a[aria-label="User Account"]')!
+      .click();
+    await harness.fixture.whenStable();
     expect(TestBed.inject(Router).url).toBe('/user-info');
     expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
     const profilePage = harness.routeDebugElement!.query(By.directive(UserInfo))
@@ -432,7 +442,7 @@ describe('Login', () => {
       },
       expect.any(Object),
     );
-    expect(TestBed.inject(Router).url).toBe('/user-info');
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
   });
 
   it('pastes a full code into any digit and preserves empty positions when editing', async () => {
@@ -488,7 +498,7 @@ describe('Login', () => {
     postMock.mockResolvedValueOnce(verifyResponse());
     dialog().querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
     await fixture.whenStable();
-    expect(TestBed.inject(Router).url).toBe('/user-info');
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
   });
 
   it.each(['', '12345', '1234567', '12a456', ' 12345', '１２３４５６'])(
@@ -554,7 +564,7 @@ describe('Login', () => {
       expect(component.preAuthToken()).toBe('');
       expect(component.otpForm.getRawValue()).toEqual({ totpToken: '', rememberDevice: false });
       expect(component.password).toBe('');
-      expect(TestBed.inject(Router).url).toBe('/user-info');
+      expect(TestBed.inject(Router).url).toBe('/dashboard');
 
       // Recreating the page must restore the device choice from the saved session.
       fixture.destroy();
@@ -605,6 +615,8 @@ describe('Login', () => {
       await harness.fixture.whenStable();
 
       for (let cycle = 0; cycle < 3; cycle++) {
+        await harness.navigateByUrl('/user-info');
+        await harness.fixture.whenStable();
         expect(getAuthSession()).toMatchObject({ twoFaEnabled: true, rememberDevice: true });
         const selectedStorage = rememberMe ? localStorage : sessionStorage;
         const otherStorage = rememberMe ? sessionStorage : localStorage;
@@ -654,6 +666,8 @@ describe('Login', () => {
       await loginPage.verifyTwoFa();
       await harness.fixture.whenStable();
       expect(getAuthSession()?.rememberDevice).toBe(false);
+      await harness.navigateByUrl('/user-info');
+      await harness.fixture.whenStable();
       harness
         .routeNativeElement!.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!
         .click();
@@ -709,7 +723,7 @@ describe('Login', () => {
       dialog().querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
       await fixture.whenStable();
       expect(postMock).toHaveBeenCalledTimes(3);
-      expect(TestBed.inject(Router).url).toBe('/user-info');
+      expect(TestBed.inject(Router).url).toBe('/dashboard');
     },
   );
 
@@ -745,7 +759,7 @@ describe('Login', () => {
     resolveRequest(verifyResponse());
     await pending;
     expect(component.isVerifying()).toBe(false);
-    expect(TestBed.inject(Router).url).toBe('/user-info');
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
   });
 
   it.each(['button', 'close', 'escape'])(

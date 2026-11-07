@@ -1,0 +1,35 @@
+<div
+  class="overflow-x-auto rounded-xl border border-gray-100 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
+  tabindex="0"
+  role="region"
+  aria-label="Wallet accounts table"
+>
+  <table class="w-full min-w-[580px] text-left text-sm">
+    <thead class="bg-gray-50 text-xs font-medium text-gray-600">
+      <tr>
+        <th scope="col" class="px-4 py-3">Account</th>
+        <th scope="col" class="px-4 py-3">Category</th>
+        <th scope="col" class="px-4 py-3">Type</th>
+        <th scope="col" class="px-4 py-3">Account Number</th>
+        <th scope="col" class="px-4 py-3 text-right">Balance</th>
+        <th scope="col" class="px-4 py-3 text-right">Equity</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      @for (account of accounts(); track account.id) {
+        <tr>
+          <th scope="row" class="px-4 py-3 font-medium wrap-break-word">{{ account.name }}</th>
+          <td class="px-4 py-3">{{ (account.tradingType | titlecase) || 'Other' }}</td>
+          <td class="px-4 py-3">{{ account.type | titlecase }}</td>
+          <td class="px-4 py-3 tabular-nums">{{ account.number }}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+            {{ (account.balance | currency: 'USD') ?? '—' }}
+          </td>
+          <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+            {{ (account.equity | currency: 'USD') ?? '—' }}
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

@@ -11,7 +11,7 @@ import {
   getRememberedAuthSession,
   setAuthSession,
 } from '../../../shared/guard/auth';
-import { GoogleAuth } from '../../components/google-auth/google-auth';
+import { GoogleAuth } from '../../components/userAccount/google-auth/google-auth';
 import { Verify } from './verify';
 
 describe('Verify KYC flow', () => {

@@ -10,9 +10,9 @@ import {
   viewChildren,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Button } from '../../components/button/button';
-import { Checkbox } from '../../components/checkbox/checkbox';
-import { InputComponent } from '../../components/input/input';
+import { Button } from '../../components/ui/button/button';
+import { Checkbox } from '../../components/ui/checkbox/checkbox';
+import { InputComponent } from '../../components/ui/input/input';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Navbar } from '../../components/navbar/navbar';
@@ -179,7 +179,7 @@ export class Login implements OnDestroy {
     this.password = '';
     this.loginForm.controls.password.markAsUntouched();
     this.successMessage.set(message);
-    await this.router.navigateByUrl('/user-info');
+    await this.router.navigateByUrl('/dashboard');
   }
 
   async verifyTwoFa(): Promise<void> {

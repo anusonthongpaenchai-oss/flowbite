@@ -1,10 +1,10 @@
 import { Component, inject, signal } from '@angular/core';
-import { InputComponent } from '../../components/input/input';
+import { InputComponent } from '../../components/ui/input/input';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { signupUser } from '../../../shared/api/auth/signup';
-import { Checkbox } from '../../components/checkbox/checkbox';
-import { Button } from '../../components/button/button';
+import { Checkbox } from '../../components/ui/checkbox/checkbox';
+import { Button } from '../../components/ui/button/button';
 import { Navbar } from '../../components/navbar/navbar';
 import { termAndCondition } from '../../../shared/documents/terms';
 

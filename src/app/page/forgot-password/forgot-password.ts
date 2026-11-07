@@ -2,8 +2,8 @@ import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Navbar } from '../../components/navbar/navbar';
-import { Button } from '../../components/button/button';
-import { InputComponent } from '../../components/input/input';
+import { Button } from '../../components/ui/button/button';
+import { InputComponent } from '../../components/ui/input/input';
 import { forgotPassword } from '../../../shared/api/auth/forgotPassword';
 
 @Component({

@@ -1,0 +1,19 @@
+<button
+  [type]="type()"
+  [disabled]="disabled()"
+  [class]="buttonClasses()"
+  (click)="onClick.emit()"
+  [routerLink]="routerLink()"
+>
+  @if (icon()) {
+    <img
+      [src]="icon()"
+      alt=""
+      aria-hidden="true"
+      class="shrink-0 object-contain"
+      [class.size-3]="size() === 'compact'"
+      [class.size-5]="size() === 'default'"
+    />
+  }
+  <ng-content>Button</ng-content>
+</button>

@@ -1,0 +1,158 @@
+<div
+  class="sidebar group/sidebar flex h-full min-h-0 flex-col gap-4 text-sm leading-[1.5] [&_svg]:shrink-0 [&_svg]:stroke-current [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round] [&_svg]:[stroke-width:1.8]"
+  [class.is-collapsed]="collapsed()"
+>
+  <section
+    class="summary-card shrink-0 rounded-[18px] border border-[#f0f1f3] bg-white p-4 group-[.is-collapsed]/sidebar:p-3"
+    aria-label="Account summary"
+  >
+    <div
+      class="brand-row flex items-center justify-between gap-2 group-[.is-collapsed]/sidebar:flex-col group-[.is-collapsed]/sidebar:gap-3"
+    >
+      <div class="brand flex min-w-0 items-center gap-2">
+        <img src="svg/Logo.svg" width="26" height="26" alt="" />
+        <span class="brand-name text-[20px] font-semibold group-[.is-collapsed]/sidebar:hidden"
+          >Flowbite</span
+        >
+      </div>
+      <button
+        type="button"
+        class="toggle-button grid size-10 shrink-0 cursor-pointer place-items-center rounded-[10px] border-0 bg-gray-100 text-[#111] hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1c64f2]"
+        [attr.aria-label]="
+          mobile() ? 'Close navigation' : collapsed() ? 'Expand sidebar' : 'Collapse sidebar'
+        "
+        [attr.aria-expanded]="mobile() ? true : !collapsed()"
+        [title]="
+          mobile() ? 'Close navigation' : collapsed() ? 'Expand sidebar' : 'Collapse sidebar'
+        "
+        (click)="toggleRequested.emit()"
+      >
+        <svg class="size-[22px]" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          @if (mobile()) {
+            <path d="m6 6 12 12M6 18 18 6" />
+          } @else {
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <path d="M9 4v16" />
+            <path [attr.d]="collapsed() ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'" />
+          }
+        </svg>
+      </button>
+    </div>
+    <div class="user-summary mt-4 flex items-center gap-3 group-[.is-collapsed]/sidebar:hidden">
+      @if (avatarUrl() && failedImage() !== avatarUrl()) {
+        <img
+          class="user-avatar size-13 shrink-0 rounded-full object-cover"
+          [src]="avatarUrl()"
+          [alt]="fullName()"
+          (error)="failedImage.set(avatarUrl())"
+        />
+      } @else {
+        <div
+          class="user-avatar avatar-fallback grid size-13 shrink-0 place-items-center rounded-full bg-[#e1effe] text-[20px] font-semibold text-[#1e429f]"
+          role="img"
+          [attr.aria-label]="fullName()"
+        >
+          {{ initials() }}
+        </div>
+      }
+      <div class="user-details min-w-0">
+        <p class="user-name truncate text-[16px] font-semibold" [title]="fullName()">
+          {{ fullName() }}
+        </p>
+        <p class="user-email truncate text-gray-500" [title]="member()?.email ?? ''">
+          {{ member()?.email || '—' }}
+        </p>
+        <span
+          class="metric-badge mt-[3px] inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-px text-[12px] whitespace-nowrap text-[#111928]"
+        >
+          <img class="size-[13px] shrink-0" src="svg/sidebar/gift.svg" alt="" />
+          3000 GP
+        </span>
+      </div>
+    </div>
+    <div
+      class="balance-summary mt-4 border-t border-gray-100 pt-3.5 group-[.is-collapsed]/sidebar:hidden"
+    >
+      <div class="balance-row flex items-center justify-between gap-2 text-gray-500">
+        <span>Available Balance</span
+        ><strong class="text-[22px] font-bold whitespace-nowrap text-[#1c64f2]">{{
+          activePage() === 'wallet' ? '—' : '$ 3,000'
+        }}</strong>
+      </div>
+      <span
+        class="metric-badge mt-[3px] inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-px text-[12px] whitespace-nowrap text-[#111928]"
+      >
+        <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 20v-6M9 20v-9M14 20v-6M19 20V8M3 10l6-6 5 5 7-7M17 2h4v4" />
+        </svg>
+        20 lots/Day
+      </span>
+    </div>
+  </section>
+
+  <nav
+    class="navigation-card min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[18px] border border-[#f0f1f3] bg-white p-3 [scrollbar-width:thin] group-[.is-collapsed]/sidebar:p-2"
+    aria-label="Sidebar"
+  >
+    @for (group of groups; track group.label) {
+      <section
+        class="navigation-group not-first:mt-0.5 group-[.is-collapsed]/sidebar:not-first:mt-2 group-[.is-collapsed]/sidebar:not-first:border-t group-[.is-collapsed]/sidebar:not-first:border-gray-100 group-[.is-collapsed]/sidebar:not-first:pt-2"
+        [attr.aria-label]="group.label"
+      >
+        <h2
+          class="group-title mt-0.5 mb-1 font-semibold text-[#3f83f8] group-[.is-collapsed]/sidebar:sr-only"
+        >
+          {{ group.label }}
+        </h2>
+        @for (item of group.items; track item.label) {
+          @if (item.url) {
+            <a
+              class="navigation-item group/item flex min-h-12 w-full cursor-pointer items-center gap-3.5 rounded-lg border-0 bg-transparent p-2.5 text-left text-[#374151] no-underline hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1c64f2] group-[.is-collapsed]/sidebar:justify-center group-[.is-collapsed]/sidebar:px-0 [&.active]:bg-[#ebf5ff] [&.active]:font-medium [&.active]:text-[#1c64f2]"
+              [class.active]="activePage() === item.page"
+              [routerLink]="item.url"
+              [attr.aria-current]="activePage() === item.page ? 'page' : null"
+              [attr.aria-label]="item.label"
+              [title]="collapsed() ? item.label : ''"
+              (click)="navigated.emit()"
+              ><ng-container
+                [ngTemplateOutlet]="itemContent"
+                [ngTemplateOutletContext]="{ $implicit: item }"
+            /></a>
+          } @else {
+            <button
+              type="button"
+              class="navigation-item group/item flex min-h-12 w-full items-center gap-3.5 rounded-lg border-0 bg-transparent p-2.5 text-left text-[#374151] disabled:cursor-not-allowed group-[.is-collapsed]/sidebar:justify-center group-[.is-collapsed]/sidebar:px-0"
+              disabled
+              [attr.aria-label]="item.label"
+              [title]="item.label + ' — Coming soon'"
+            >
+              <ng-container
+                [ngTemplateOutlet]="itemContent"
+                [ngTemplateOutletContext]="{ $implicit: item }"
+              />
+            </button>
+          }
+        }
+      </section>
+    }
+  </nav>
+</div>
+
+<ng-template #itemContent let-item>
+  <span
+    class="navigation-icon size-5 shrink-0 mask-contain mask-center mask-no-repeat bg-[#111] group-[.active]/item:bg-[#1c64f2]"
+    [style.mask-image]="'url(' + item.icon + ')'"
+    aria-hidden="true"
+  ></span>
+  <span class="item-label group-[.is-collapsed]/sidebar:hidden">{{ item.label }}</span>
+  @if (item.chevron) {
+    <svg
+      class="chevron ml-auto size-4 text-[#111] group-[.is-collapsed]/sidebar:hidden"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  }
+</ng-template>
