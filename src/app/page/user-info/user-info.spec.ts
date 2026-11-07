@@ -8,7 +8,7 @@ import type { ProfileUpdateRequest } from '../../../shared/api/userInfo/profileU
 import type { UserInfoResponse } from '../../../shared/api/userInfo/userInfo';
 import { clearAuthSession, getAuthSession, setAuthSession } from '../../../shared/guard/auth';
 import { routes } from '../../app.routes';
-import { AccountLayout } from '../../layouts/account-layout/account-layout';
+import { PortalLayout } from '../../components/layouts/portal-layout/portal-layout';
 import { Login } from '../login/login';
 import { UserInfo } from './user-info';
 
@@ -346,7 +346,7 @@ describe('UserInfo', () => {
     'confirms logout with remove remembered devices set to %s, clears the session, and opens Login',
     async (removeRememberedDevices) => {
       const harness = await RouterTestingHarness.create();
-      await harness.navigateByUrl('/user-info', AccountLayout);
+      await harness.navigateByUrl('/user-info', PortalLayout);
       await harness.fixture.whenStable();
       const router = TestBed.inject(Router);
       const navigate = vi.spyOn(router, 'navigateByUrl');
@@ -677,7 +677,7 @@ describe('UserInfo', () => {
     'clears both session stores and opens Login after changing the password with %s OTP',
     async (method) => {
       const harness = await RouterTestingHarness.create();
-      await harness.navigateByUrl('/user-info', AccountLayout);
+      await harness.navigateByUrl('/user-info', PortalLayout);
       await harness.fixture.whenStable();
       localStorage.setItem('authSession', sessionStorage.getItem('authSession')!);
       const router = TestBed.inject(Router);
@@ -728,7 +728,7 @@ describe('UserInfo', () => {
     'returns from address to member without closing Edit Profile when clicking the Back %s',
     async (target) => {
       const harness = await RouterTestingHarness.create();
-      await harness.navigateByUrl('/user-info', AccountLayout);
+      await harness.navigateByUrl('/user-info', PortalLayout);
       const userInfo = harness.routeDebugElement!.query(By.directive(UserInfo))
         .componentInstance as UserInfo;
       await harness.fixture.whenStable();

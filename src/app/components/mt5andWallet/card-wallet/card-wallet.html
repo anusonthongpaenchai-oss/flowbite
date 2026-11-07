@@ -1,0 +1,160 @@
+<dialog
+  #dialog
+  aria-labelledby="wallet-detail-title"
+  class="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-[560px] overflow-y-auto overscroll-contain rounded-2xl border border-gray-100 bg-white p-4 text-gray-900 backdrop:bg-black/55 sm:p-6"
+  (cancel)="close($event)"
+>
+  <div class="mb-5 flex justify-end">
+    <h2 id="wallet-detail-title" class="sr-only">Wallet details</h2>
+    <app-button variant="secondary" size="compact" icon="svg/icon/x.svg" (onClick)="close()">
+      <span class="sr-only">Close wallet details</span>
+    </app-button>
+  </div>
+
+  @if (data(); as details) {
+    @let wallet = details.wallet;
+    <div class="grid gap-5">
+      <section
+        class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border border-gray-100 p-4"
+        [style.background-image]="gradient()"
+        aria-label="Wallet overview"
+      >
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 text-base font-semibold wrap-break-word">
+            @if (memberImage()) {
+              <img
+                [src]="memberImage()"
+                alt=""
+                class="size-7 shrink-0 rounded-full object-cover"
+                (error)="memberImage.set('')"
+              />
+            } @else {
+              <img src="svg/sidebar/user-circle.svg" alt="" class="size-7 shrink-0" />
+            }
+            <span>{{ memberName }}</span>
+          </div>
+          <p class="mt-4 text-sm text-gray-600">Available Balance</p>
+          <div class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <strong class="text-xl leading-tight font-bold wrap-break-word text-[#1C64F2]">
+              {{ (balance() | number: '1.2-2') ?? '—' }}
+            </strong>
+            <span class="text-sm text-gray-600 uppercase">{{ currency() }}</span>
+          </div>
+        </div>
+        <img
+          [src]="theme().coin"
+          alt=""
+          class="row-span-2 w-[clamp(48px,19vw,128px)] object-contain"
+        />
+        <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase">
+          @if (wallet.member_id != null) {
+            <span class="rounded-md bg-gray-100 px-2 py-1">#{{ wallet.member_id }}</span>
+          }
+          <span class="rounded-md bg-gray-100 px-2 py-1">{{ platform }}</span>
+          @if (wallet.wallet_trading_type) {
+            <span class="rounded-md bg-[#FDF6B2] px-2 py-1 text-amber-900">{{
+              wallet.wallet_trading_type
+            }}</span>
+          }
+          @if (currency()) {
+            <span class="rounded-md bg-gray-100 px-2 py-1">{{ currency() }}</span>
+          }
+        </div>
+      </section>
+
+      <dl class="grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 sm:gap-5">
+        @for (field of passwordFields; track field.name) {
+          @let password = wallet[field.key];
+          @let visible = revealed()[field.name];
+          <div
+            class="row-span-3 grid min-h-32 min-w-0 grid-rows-subgrid gap-y-2 rounded-2xl bg-gray-50 p-4 min-[480px]:min-h-[146px]"
+          >
+            <dt class="text-sm text-gray-500">{{ field.label }}</dt>
+            <dd class="self-start text-base leading-tight font-bold wrap-anywhere">
+              {{ password ? (visible ? password : '*******') : '—' }}
+            </dd>
+            <dd class="flex items-center justify-between gap-2 self-center">
+              <button
+                type="button"
+                class="grid size-7 cursor-pointer place-items-center rounded-md hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-[#1C64F2] disabled:cursor-not-allowed disabled:opacity-50"
+                [attr.aria-label]="(visible ? 'Hide ' : 'Show ') + field.name + ' password'"
+                [disabled]="!password"
+                (click)="togglePassword(field.name)"
+              >
+                <img src="svg/icon/eye.svg" alt="" class="size-5" />
+              </button>
+              <button
+                type="button"
+                class="grid size-7 place-items-center disabled:cursor-not-allowed"
+                [attr.aria-label]="'Edit ' + field.name + ' password'"
+                disabled
+              >
+                <img src="svg/icon/edit.svg" alt="" class="size-5" />
+              </button>
+            </dd>
+          </div>
+        }
+        @for (metric of metrics(); track metric.label) {
+          <div
+            class="row-span-3 grid min-h-32 min-w-0 grid-rows-subgrid gap-y-2 rounded-2xl bg-gray-50 p-4 min-[480px]:min-h-[146px]"
+          >
+            <dt class="text-sm text-gray-500">{{ metric.label }}</dt>
+            <dd class="flex flex-wrap items-baseline gap-x-2 gap-y-1 self-start">
+              <strong class="text-base leading-tight font-bold wrap-anywhere text-black">
+                {{
+                  (metric.value
+                    | number
+                      : (metric.value !== null && metric.value % 1 !== 0 ? '1.2-2' : '1.0-0')) ??
+                    '—'
+                }}
+              </strong>
+              @if (metric.label === 'Credit' && metric.value !== null) {
+                <span class="text-sm text-gray-500 uppercase">{{ currency() }}</span>
+              }
+            </dd>
+            @if (metric.label !== 'Credit' && metric.value !== null) {
+              <dd class="self-center text-sm text-gray-500 uppercase">{{ currency() }}</dd>
+            }
+          </div>
+        }
+        <div
+          class="row-span-3 grid min-h-32 min-w-0 grid-rows-subgrid gap-y-2 rounded-2xl bg-gray-50 p-4 min-[480px]:min-h-[146px]"
+        >
+          <dt class="text-sm text-gray-500">Leverage</dt>
+          <dd class="self-start text-base leading-tight font-bold">
+            {{ leverage() === null ? '—' : '1:' + leverage() }}
+          </dd>
+          <dd class="self-center">
+            <button
+              type="button"
+              class="grid size-7 place-items-center disabled:cursor-not-allowed"
+              aria-label="Edit leverage"
+              disabled
+            >
+              <img src="svg/icon/edit.svg" alt="" class="size-5" />
+            </button>
+          </dd>
+        </div>
+      </dl>
+
+      <div class="grid grid-cols-2 gap-3 sm:gap-5">
+        <app-button size="compact" [disabled]="true">Deposit</app-button>
+        <app-button variant="secondary" size="compact" [disabled]="true"
+          >Withdraw/Transfer</app-button
+        >
+        <app-button class="col-span-2" variant="secondary" size="compact" [disabled]="true"
+          >Transaction History</app-button
+        >
+      </div>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="grid justify-items-center gap-3 rounded-xl bg-gray-50 p-5 text-sm">
+      <p role="alert">Unable to load wallet details.</p>
+      <app-button variant="secondary" size="compact" (onClick)="load()">Retry</app-button>
+    </div>
+  } @else {
+    <p role="status" class="rounded-xl bg-gray-50 p-5 text-center text-sm text-gray-600">
+      Loading wallet details…
+    </p>
+  }
+</dialog>
