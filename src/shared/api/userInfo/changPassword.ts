@@ -1,6 +1,5 @@
-import { type AxiosResponse, isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
+import { api, type ApiResponse, isApiError } from '../api';
 
 export type RequestChangPassword = {
   currentPassword: string;
@@ -27,7 +26,7 @@ type errorSend = {
 };
 
 function requestError(error: unknown, fallback: string): Error {
-  if (isAxiosError<errorSend>(error)) {
+  if (isApiError<errorSend>(error)) {
     const response = error.response?.data;
     return new Error(response?.error?.message || response?.message || fallback);
   }
@@ -40,7 +39,7 @@ export async function changPassword(body: RequestChangPassword): Promise<Respons
     throw new Error('Please sign in to change your password.');
   }
 
-  let response: AxiosResponse<ResponseChangPassword>;
+  let response: ApiResponse<ResponseChangPassword>;
 
   try {
     response = await api.put<ResponseChangPassword>('/v1/member/change-password', body);

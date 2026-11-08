@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { AxiosError, type AxiosResponse } from 'axios';
-import { api } from '../../../../../shared/api/api';
+import { api, ApiError, type ApiResponse } from '../../../../../shared/api/api';
 import { clearAuthSession, getAuthSession, setAuthSession } from '../../../../../shared/guard/auth';
 import { ChangPassword } from './chang-password';
 
@@ -16,11 +15,11 @@ describe('ChangPassword', () => {
     confirmPassword: 'new-password',
   };
 
-  function response(data: unknown, status = 200): AxiosResponse {
-    return { data, status } as AxiosResponse;
+  function response(data: unknown, status = 200): ApiResponse {
+    return { data, status } as ApiResponse;
   }
 
-  function otpResponse(): AxiosResponse {
+  function otpResponse(): ApiResponse {
     return response({
       message: 'OTP sent.',
       memberRef: 'unused-top-level-reference',
@@ -28,12 +27,9 @@ describe('ChangPassword', () => {
     });
   }
 
-  function backendError(message: string): AxiosError {
-    return new AxiosError(
+  function backendError(message: string): ApiError {
+    return new ApiError(
       'Request failed',
-      AxiosError.ERR_BAD_REQUEST,
-      undefined,
-      undefined,
       response({ result: false, message: 'Request failed.', error: { code: 'OTP', message } }, 422),
     );
   }
@@ -123,6 +119,7 @@ describe('ChangPassword', () => {
     const select = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
     select.value = method;
     select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
   }
 
   it('starts with SMS selected and only shows OTP and Verify after sending', async () => {
@@ -217,18 +214,11 @@ describe('ChangPassword', () => {
       fields: { ...passwords, confirmPassword: 'different-password' },
       messages: ['Passwords do not match.'],
     },
-    {
-      name: 'all passwords are blank',
-      fields: { currentPassword: '', newPassword: '', confirmPassword: '' },
-      messages: [
-        'New password must be different from your old password.',
-        'Confirm password must be different from your old password.',
-      ],
-    },
   ])('shows field errors and does not send OTP when $name', async ({ fields, messages }) => {
     for (const [name, value] of Object.entries(fields)) {
       fillInput(name, value);
     }
+    await fixture.whenStable();
 
     button('Next')!.click();
     await fixture.whenStable();
@@ -246,6 +236,34 @@ describe('ChangPassword', () => {
     expect(component.isBusy()).toBe(false);
     expect(input('newPassword').disabled).toBe(false);
     expect(button('Next')!.disabled).toBe(false);
+  });
+
+  it.each([
+    { currentPassword: '', newPassword: '', confirmPassword: '' },
+    { ...passwords, currentPassword: '' },
+    { ...passwords, newPassword: '' },
+    { ...passwords, confirmPassword: '' },
+  ])('blocks Next without showing a missing-password alert', async (fields) => {
+    for (const [name, value] of Object.entries(fields)) {
+      fillInput(name, value);
+    }
+    await fixture.whenStable();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(button('Next')!.disabled).toBe(true);
+    expect(element.querySelector('[role="alert"]')).toBeNull();
+
+    element.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await fixture.whenStable();
+
+    expect(postMock).not.toHaveBeenCalled();
+    expect(component.otpSent()).toBe(false);
+
+    fillPasswords();
+    await fixture.whenStable();
+
+    expect(button('Next')!.disabled).toBe(false);
+    expect(element.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('clears field errors as the new passwords are corrected and then sends OTP', async () => {
@@ -315,7 +333,7 @@ describe('ChangPassword', () => {
       postMock.mockRejectedValueOnce(
         failure === 'backend'
           ? backendError('Unable to deliver OTP.')
-          : new AxiosError('Network Error', AxiosError.ERR_NETWORK),
+          : new ApiError('Network Error'),
       );
 
       button('Next')!.click();
@@ -355,7 +373,7 @@ describe('ChangPassword', () => {
         putMock.mockRejectedValueOnce(
           failure === 'backend'
             ? backendError('OTP was rejected.')
-            : new AxiosError('Network Error', AxiosError.ERR_NETWORK),
+            : new ApiError('Network Error'),
         );
       }
 
@@ -411,7 +429,7 @@ describe('ChangPassword', () => {
   it('blocks duplicate sends, saving, and cancellation while sending OTP', async () => {
     fillPasswords();
     const closed = vi.spyOn(component.closed, 'emit');
-    let resolveRequest!: (value: AxiosResponse) => void;
+    let resolveRequest!: (value: ApiResponse) => void;
     postMock.mockReturnValueOnce(new Promise((resolve) => (resolveRequest = resolve)));
 
     button('Next')!.click();
@@ -440,7 +458,7 @@ describe('ChangPassword', () => {
     fillPasswords();
     await component.onNext();
     await fixture.whenStable();
-    let resolveRequest!: (value: AxiosResponse) => void;
+    let resolveRequest!: (value: ApiResponse) => void;
     putMock.mockReturnValueOnce(new Promise((resolve) => (resolveRequest = resolve)));
 
     button('Verify')!.click();

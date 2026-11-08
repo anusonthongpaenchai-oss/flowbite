@@ -1,6 +1,5 @@
-import { isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
+import { api, isApiError } from '../api';
 
 type TotpVerifySetupRequest = {
   token: string;
@@ -28,7 +27,7 @@ export async function totpVerifySetup(
     );
     data = response.data;
   } catch (error) {
-    if (isAxiosError<{ message?: string; error?: { message?: string } }>(error)) {
+    if (isApiError<{ message?: string; error?: { message?: string } }>(error)) {
       throw new Error(
         error.response?.data?.error?.message || error.response?.data?.message || fallback,
       );

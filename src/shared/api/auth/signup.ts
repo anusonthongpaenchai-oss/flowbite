@@ -1,5 +1,4 @@
-import { isAxiosError } from 'axios';
-import { api } from '../api';
+import { api, isApiError } from '../api';
 
 type signupRequest = {
   firstName: string;
@@ -36,7 +35,7 @@ export async function signupUser(data: signupRequest): Promise<signupResponse> {
     const response = await api.post<signupResponse>('/v1/member/register', data);
     return response.data;
   } catch (error) {
-    if (isAxiosError<signupError>(error)) {
+    if (isApiError<signupError>(error)) {
       const payload = error.response?.data;
       const detail =
         typeof payload?.error?.message === 'string' ? payload.error.message.trim() : '';

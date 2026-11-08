@@ -2,8 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import type { AxiosResponse } from 'axios';
-import { api } from '../../../shared/api/api';
+import { api, type ApiResponse } from '../../../shared/api/api';
 import { Login } from './login';
 import { routes } from '../../app.routes';
 import { UserInfo } from '../user-info/user-info';
@@ -36,11 +35,11 @@ describe('Login', () => {
     sessionUid: 'test-session',
   };
 
-  function response(data: unknown, status = 200): AxiosResponse {
-    return { data, status } as AxiosResponse;
+  function response(data: unknown, status = 200): ApiResponse {
+    return { data, status } as ApiResponse;
   }
 
-  function successfulResponse(): AxiosResponse {
+  function successfulResponse(): ApiResponse {
     return response({
       result: 'success',
       message: 'Login successful.',
@@ -49,7 +48,7 @@ describe('Login', () => {
     });
   }
 
-  function challengeResponse(preAuthToken: unknown = 'pre-auth-token'): AxiosResponse {
+  function challengeResponse(preAuthToken: unknown = 'pre-auth-token'): ApiResponse {
     return response({
       result: true,
       message: 'Verification required.',
@@ -62,7 +61,7 @@ describe('Login', () => {
     member: { id: 1, username: 'member', email: 'member@example.com' },
   };
 
-  function verifyResponse(): AxiosResponse {
+  function verifyResponse(): ApiResponse {
     return response({ result: true, message: 'Login successful.', data: verifiedSession });
   }
 
@@ -310,7 +309,7 @@ describe('Login', () => {
   });
 
   it('disables submission and ignores duplicate requests while login is pending', async () => {
-    let resolveRequest!: (value: AxiosResponse) => void;
+    let resolveRequest!: (value: ApiResponse) => void;
     postMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -739,7 +738,7 @@ describe('Login', () => {
   it('blocks duplicate verifies, a new login and closing while verification is pending', async () => {
     await openChallenge();
     enterOtp();
-    let resolveRequest!: (value: AxiosResponse) => void;
+    let resolveRequest!: (value: ApiResponse) => void;
     postMock.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveRequest = resolve;
@@ -813,7 +812,7 @@ describe('Login', () => {
       } else {
         fillForm();
       }
-      let resolveRequest!: (value: AxiosResponse) => void;
+      let resolveRequest!: (value: ApiResponse) => void;
       postMock.mockReturnValueOnce(
         new Promise((resolve) => {
           resolveRequest = resolve;

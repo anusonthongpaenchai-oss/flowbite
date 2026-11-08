@@ -1,13 +1,5 @@
-import { type AxiosResponse, isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
-
-// const kycStatus = {
-//     0: "Pending",
-//     1: "Approved",
-//     2: "Rejected",
-//     3: "None",
-// }
+import { api, type ApiResponse, isApiError } from '../api';
 
 export type dataKycResponse = {
   id: number;
@@ -33,7 +25,7 @@ export type KycResponse = {
   data: dataKycResponse;
 };
 
-export async function getKyc(): Promise<AxiosResponse<KycResponse> | null> {
+export async function getKyc(): Promise<ApiResponse<KycResponse> | null> {
   if (!authGuard()) {
     throw new Error('Please sign in to update your profile.');
   }
@@ -42,7 +34,7 @@ export async function getKyc(): Promise<AxiosResponse<KycResponse> | null> {
     const response = await api.get<KycResponse>('/v1/verify/kyc');
     return response;
   } catch (error) {
-    if (isAxiosError(error)) {
+    if (isApiError(error)) {
       console.error(error.response?.data);
     } else {
       console.error(error);

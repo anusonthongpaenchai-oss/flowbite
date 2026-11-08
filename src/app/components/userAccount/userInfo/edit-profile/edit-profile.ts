@@ -16,6 +16,14 @@ function profileValidator(field: ProfileField): ValidatorFn {
   };
 }
 
+function internationalPhone(code: string, phone: string): string {
+  const number = phone.trim();
+  if (!number) {
+    return '';
+  }
+  return code + (code === '+66' || code === '+44' ? number.replace(/^0/, '') : number);
+}
+
 @Component({
   imports: [InputComponent, ReactiveFormsModule, Button],
   selector: 'app-edit-profile',
@@ -31,11 +39,19 @@ export class EditProfile implements OnInit {
   public updateProfile = output<ProfileUpdateRequest>();
   public profile = input<ProfileUpdateRequest | null>(null);
   public email = input('');
-  public phoneCode = input('+66');
+  public phoneCode = input('');
   public isUpdating = input(false);
   public serverError = input('');
   public pg = signal<number>(0);
   public errorMessage = signal('');
+
+  readonly genders = ['MALE', 'FEMALE', 'OTHER'];
+  readonly countries = ['Thailand', 'United Kingdom', 'United States'];
+  readonly phoneCodes = [
+    { label: 'TH +66', value: '+66' },
+    { label: 'UK +44', value: '+44' },
+    { label: 'US +1', value: '+1' },
+  ];
 
   public onBack(event: MouseEvent): void {
     event.stopPropagation();
@@ -84,13 +100,23 @@ export class EditProfile implements OnInit {
   }
 
   public editProfileForm = this.fb.nonNullable.group({
-    member: this.fb.nonNullable.group({
-      m_name: this.field('m_name'),
-      m_lastname: this.field('m_lastname'),
-      m_phone: this.field('m_phone'),
-      m_gender: this.field('m_gender', false),
-      m_country: this.field('m_country'),
-    }),
+    member: this.fb.nonNullable.group(
+      {
+        m_name: this.field('m_name'),
+        m_lastname: this.field('m_lastname'),
+        m_phone: this.fb.nonNullable.control(''),
+        m_gender: this.field('m_gender', false),
+        m_country: this.field('m_country'),
+        phoneCode: this.fb.nonNullable.control('', Validators.required),
+      },
+      {
+        validators: (group) => {
+          const { phoneCode, m_phone } = group.getRawValue();
+          const error = profileFieldError('m_phone', internationalPhone(phoneCode, m_phone));
+          return error ? { phone: error } : null;
+        },
+      },
+    ),
     address: this.fb.group({
       address: this.fb.group({
         address_no: this.field('address_no'),
@@ -104,21 +130,46 @@ export class EditProfile implements OnInit {
 
   ngOnInit(): void {
     const profile = this.profile();
-    if (profile) {
-      this.editProfileForm.setValue({
-        member: profile.member,
-        address: { address: profile.address },
-      });
+    const phone = profile?.member.m_phone.trim() ?? '';
+    const storedCode = this.phoneCode().trim().replace(/^\+/, '');
+    const internationalCode = this.phoneCodes.find(({ value }) => phone.startsWith(value))?.value;
+    const code =
+      this.phoneCodes.find(({ value }) => value.slice(1) === storedCode)?.value ??
+      internationalCode ??
+      '';
+    if (!profile) {
+      this.editProfileForm.controls.member.controls.phoneCode.setValue(code);
+      return;
     }
+
+    const { member, address } = profile;
+    const gender = member.m_gender.trim().toUpperCase();
+    const country = member.m_country.trim().toLowerCase();
+    const prefix = internationalCode ?? code.slice(1);
+    const hasPrefix =
+      prefix && phone.startsWith(prefix) && (internationalCode || phone.length > 10);
+    this.editProfileForm.setValue({
+      member: {
+        ...member,
+        m_gender: this.genders.includes(gender) ? gender : '',
+        m_country: this.countries.find((option) => option.toLowerCase() === country) ?? '',
+        m_phone: hasPrefix ? phone.slice(prefix.length) : phone,
+        phoneCode: code,
+      },
+      address: { address },
+    });
   }
 
   public fieldError(field: ProfileField): string {
+    const member = this.editProfileForm.controls.member;
     const control =
-      this.editProfileForm.controls.member.get(field) ??
-      this.editProfileForm.controls.address.controls.address.get(field);
-    return control && (control.touched || control.dirty)
-      ? profileFieldError(field, control.value)
-      : '';
+      member.get(field) ?? this.editProfileForm.controls.address.controls.address.get(field);
+    if (!control || !(control.touched || control.dirty)) {
+      return '';
+    }
+    return field === 'm_phone'
+      ? (member.getError('phone') ?? '')
+      : profileFieldError(field, control.value);
   }
 
   public onSubmit(): void {
@@ -137,7 +188,11 @@ export class EditProfile implements OnInit {
       return;
     }
 
-    const { member, address } = this.editProfileForm.getRawValue();
+    const {
+      member: { phoneCode, ...member },
+      address,
+    } = this.editProfileForm.getRawValue();
+    member.m_phone = internationalPhone(phoneCode, member.m_phone);
     this.updateProfile.emit(normalizeProfileUpdateRequest({ member, address: address.address }));
   }
 }

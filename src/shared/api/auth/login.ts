@@ -1,5 +1,4 @@
-import { AxiosError, type AxiosResponse, isAxiosError } from 'axios';
-import { api } from '../api';
+import { api, type ApiResponse, isApiError } from '../api';
 
 export interface Member {
   id: number;
@@ -45,14 +44,14 @@ export async function login(body: {
   usernameOrEmail: string;
   password: string;
 }): Promise<LoginResponse> {
-  let res: AxiosResponse<unknown>;
+  let res: ApiResponse<unknown>;
 
   try {
     res = await api.post<unknown>('/v1/auth/login', body, {
       validateStatus: () => true,
     });
   } catch (error) {
-    if (isAxiosError(error) && error.code === AxiosError.ERR_BAD_RESPONSE) {
+    if (isApiError(error) && error.invalidJson) {
       throw new Error('The server returned an invalid response. Please try again.');
     }
 

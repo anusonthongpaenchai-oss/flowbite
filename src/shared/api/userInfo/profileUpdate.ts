@@ -1,6 +1,5 @@
-import { AxiosError, type AxiosResponse, isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
+import { api, type ApiResponse, isApiError } from '../api';
 
 export type MemberRequest = {
   m_name: string;
@@ -149,16 +148,16 @@ export async function profileUpdate(body: ProfileUpdateRequest): Promise<Profile
   }
 
   const payload = normalizeProfileUpdateRequest(body);
-  let res: AxiosResponse<unknown>;
+  let res: ApiResponse<unknown>;
 
   try {
     res = await api.put<unknown>('/v1/member/profile/update', payload, {
       validateStatus: () => true,
     });
   } catch (error) {
-    if (isAxiosError(error) && error.response) {
+    if (isApiError(error) && error.response) {
       res = error.response;
-    } else if (isAxiosError(error) && error.code === AxiosError.ERR_BAD_RESPONSE) {
+    } else if (isApiError(error) && error.invalidJson) {
       throw new Error('The server returned an invalid response. Please try again.');
     } else {
       throw new Error('Unable to connect. Please check your connection and try again.');

@@ -1,5 +1,4 @@
-import { AxiosError, type AxiosResponse, isAxiosError } from 'axios';
-import { api } from '../api';
+import { api, type ApiResponse, isApiError } from '../api';
 
 export type ForgotPasswordRequest = {
   email: string;
@@ -16,14 +15,14 @@ type ForgotPasswordPayload = Partial<ForgotPasswordResponse> & {
 };
 
 export async function forgotPassword(body: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
-  let res: AxiosResponse<unknown>;
+  let res: ApiResponse<unknown>;
 
   try {
     res = await api.post<unknown>('/v1/auth/forgot-password', body, {
       validateStatus: () => true,
     });
   } catch (error) {
-    if (isAxiosError(error) && error.code === AxiosError.ERR_BAD_RESPONSE) {
+    if (isApiError(error) && error.invalidJson) {
       throw new Error('The server returned an invalid response. Please try again.');
     }
 

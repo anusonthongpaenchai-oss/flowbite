@@ -2,8 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { AxiosError, type AxiosResponse } from 'axios';
-import { api } from '../../../../shared/api/api';
+import { api, ApiError, type ApiResponse } from '../../../../shared/api/api';
 import { clearAuthSession, getAuthSession, setAuthSession } from '../../../../shared/guard/auth';
 import { routes } from '../../../app.routes';
 import { Login } from '../../../page/login/login';
@@ -74,14 +73,14 @@ describe('PortalLayout and protected routes', () => {
               : url === '/v1/trading'
                 ? { result: true, data: [] }
                 : { result: true, data: { member, address: null, isTrusted: false } },
-        }) as AxiosResponse,
+        }) as ApiResponse,
     );
     profileGetMock.mockReset().mockResolvedValue({
       data: {
         result: true,
         data: { member: { ...member, isKYC: 1 }, address: null, isTrusted: false },
       },
-    } as AxiosResponse);
+    } as ApiResponse);
     vi.spyOn(api, 'get').mockImplementation((url, config) =>
       url === '/v1/member/profile'
         ? profileGetMock(url)
@@ -127,7 +126,7 @@ describe('PortalLayout and protected routes', () => {
   it('blocks a direct wallet visit when the profile has not passed KYC', async () => {
     profileGetMock.mockResolvedValue({
       data: { result: true, data: { member: { ...member, isKYC: 0 } } },
-    } as AxiosResponse);
+    } as ApiResponse);
     setAuthSession({ ...session, member: { ...member, isKYC: 1 } });
     await harness.navigateByUrl('/mt5-wallet', PortalLayout);
     await harness.fixture.whenStable();
@@ -143,7 +142,7 @@ describe('PortalLayout and protected routes', () => {
   it('opens the KYC popup from the wallet menu, can close it, and confirms via User verify', async () => {
     profileGetMock.mockResolvedValue({
       data: { result: true, data: { id: member.id, isKYC: 0 } },
-    } as AxiosResponse);
+    } as ApiResponse);
     await open();
     const element = harness.routeNativeElement!;
     const walletLink = element.querySelector<HTMLAnchorElement>('a[aria-label="MT5 & Wallet"]')!;
@@ -169,7 +168,7 @@ describe('PortalLayout and protected routes', () => {
 
     profileGetMock.mockResolvedValue({
       data: { result: true, data: { member: { ...member, isKYC: 1 } } },
-    } as AxiosResponse);
+    } as ApiResponse);
     await harness.navigateByUrl('/mt5-wallet', PortalLayout);
     expect(harness.routeNativeElement!.querySelector('app-mt5-wallet')).not.toBeNull();
   });
@@ -188,7 +187,7 @@ describe('PortalLayout and protected routes', () => {
   it.each([true, false, 2])('blocks wallet access for unsupported KYC status %s', async (isKyc) => {
     profileGetMock.mockResolvedValue({
       data: { result: true, data: { member: { ...member, isKyc } } },
-    } as AxiosResponse);
+    } as ApiResponse);
     await open('/mt5-wallet');
 
     const element = harness.routeNativeElement!;
@@ -204,7 +203,7 @@ describe('PortalLayout and protected routes', () => {
       async (url) =>
         ({
           data: { result: true, data: url === '/v1/trading' ? [] : { leverages: [100] } },
-        }) as AxiosResponse,
+        }) as ApiResponse,
     );
     const post = vi.spyOn(api, 'post').mockRejectedValue(new Error('Unexpected POST'));
     await open('/mt5-wallet');
@@ -232,7 +231,7 @@ describe('PortalLayout and protected routes', () => {
     await harness.fixture.whenStable();
     profileGetMock.mockResolvedValue({
       data: { result: true, data: { member: { ...member, isKyc: 0 } } },
-    } as AxiosResponse);
+    } as ApiResponse);
     dialog.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
 
     await vi.waitFor(() =>
@@ -270,14 +269,14 @@ describe('PortalLayout and protected routes', () => {
       wallet_balance: 0,
     };
     getMock
-      .mockResolvedValueOnce({ data: { result: true, data: [] } } as AxiosResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: [] } } as ApiResponse)
       .mockResolvedValueOnce({
         data: { result: true, data: { leverages: entry.options } },
-      } as AxiosResponse)
-      .mockResolvedValueOnce({ data: { result: true, data: [createdWallet] } } as AxiosResponse);
+      } as ApiResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: [createdWallet] } } as ApiResponse);
     const post = vi.spyOn(api, 'post').mockResolvedValue({
       data: { result: true, data: { wallet: createdWallet } },
-    } as AxiosResponse);
+    } as ApiResponse);
 
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
@@ -346,30 +345,28 @@ describe('PortalLayout and protected routes', () => {
   it.each([
     {
       label: 'API rejection',
-      error: Object.assign(new AxiosError('Bad Request'), {
-        response: {
-          status: 400,
-          data: { error: { message: 'The selected account type is unavailable.' } },
-        },
-      }),
+      error: new ApiError('Bad Request', {
+        status: 400,
+        data: { error: { message: 'The selected account type is unavailable.' } },
+      } as ApiResponse),
       message: 'The selected account type is unavailable.',
       unconfirmed: false,
     },
     {
       label: 'timeout',
-      error: new AxiosError('Timeout', AxiosError.ECONNABORTED),
+      error: new ApiError('Timeout'),
       message: 'Could not confirm whether the account was opened.',
       unconfirmed: true,
     },
   ])('keeps the form open after a $label and prevents duplicate submission', async (entry) => {
     getMock
-      .mockResolvedValue({ data: { result: true, data: [] } } as AxiosResponse)
-      .mockResolvedValueOnce({ data: { result: true, data: [] } } as AxiosResponse)
+      .mockResolvedValue({ data: { result: true, data: [] } } as ApiResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: [] } } as ApiResponse)
       .mockResolvedValueOnce({
         data: { result: true, data: { leverages: [50, 100] } },
-      } as AxiosResponse);
-    let rejectRequest!: (error: AxiosError) => void;
-    const request = new Promise<AxiosResponse>((_, reject) => (rejectRequest = reject));
+      } as ApiResponse);
+    let rejectRequest!: (error: ApiError) => void;
+    const request = new Promise<ApiResponse>((_, reject) => (rejectRequest = reject));
     const post = vi.spyOn(api, 'post').mockReturnValue(request);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
@@ -445,7 +442,7 @@ describe('PortalLayout and protected routes', () => {
           wallet(8, 'Funded Echo', 'trading', ' FUNDED '),
         ],
       },
-    } as AxiosResponse);
+    } as ApiResponse);
 
     const link = element.querySelector<HTMLAnchorElement>('a[aria-label="MT5 & Wallet"]');
     expect(link).not.toBeNull();
@@ -530,11 +527,11 @@ describe('PortalLayout and protected routes', () => {
       .mockResolvedValueOnce({
         status: 200,
         data: { result: true, data: [wallet] },
-      } as AxiosResponse)
+      } as ApiResponse)
       .mockResolvedValueOnce({
         status: 200,
         data: { result: true, data: { wallet } },
-      } as AxiosResponse);
+      } as ApiResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
@@ -579,11 +576,11 @@ describe('PortalLayout and protected routes', () => {
       .mockResolvedValueOnce({
         status: 200,
         data: { result: true, data: [first, selected] },
-      } as AxiosResponse)
+      } as ApiResponse)
       .mockResolvedValueOnce({
         status: 200,
         data: { result: true, data: { wallet: { ...selected, member_id: 14966 } } },
-      } as AxiosResponse);
+      } as ApiResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     [...page.querySelectorAll('button')]
@@ -606,7 +603,7 @@ describe('PortalLayout and protected routes', () => {
     getMock.mockRejectedValueOnce(new Error('Network failed')).mockResolvedValueOnce({
       status: 200,
       data: { result: true, message: '', data: [] },
-    } as AxiosResponse);
+    } as ApiResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     await vi.waitFor(() => {
@@ -652,7 +649,7 @@ describe('PortalLayout and protected routes', () => {
           },
         ],
       },
-    } as AxiosResponse);
+    } as ApiResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     await vi.waitFor(() =>
@@ -758,7 +755,7 @@ describe('PortalLayout and protected routes', () => {
     vi.spyOn(api, 'put').mockResolvedValueOnce({
       status: 200,
       data: { result: true, message: 'Saved.' },
-    } as AxiosResponse);
+    } as ApiResponse);
     profileGetMock.mockRejectedValueOnce(new Error('Reload failed.'));
     await profile.onUpdate({
       member: {
@@ -797,7 +794,7 @@ describe('PortalLayout and protected routes', () => {
           isTrusted: false,
         },
       },
-    } as AxiosResponse);
+    } as ApiResponse);
     const profile = harness.routeDebugElement!.query(By.directive(UserInfo))
       .componentInstance as UserInfo;
     profile.onImageSaved();

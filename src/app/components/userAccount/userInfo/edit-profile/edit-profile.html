@@ -48,50 +48,82 @@
               [error]="fieldError('m_lastname')"
             ></app-input>
 
-            <app-input
-              label="Gender (optional)"
-              placeholder="Please input"
-              formControlName="m_gender"
-              [error]="fieldError('m_gender')"
-            ></app-input>
+            <label class="flex min-w-0 flex-col gap-1 font-medium">
+              <span>Gender (optional)</span>
+              <select
+                class="profile-select h-[42px] w-full rounded-lg border border-[#d1d5db] bg-[#f9fafb] px-3.5 font-normal focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                formControlName="m_gender"
+              >
+                @for (gender of genders; track gender) {
+                  <option [value]="gender">{{ gender }}</option>
+                }
+              </select>
+            </label>
 
             <!-- country / region -->
-            <div class="relative [&_app-input_input]:pr-10">
-              <app-input
-                [label]="'Country/Region*'"
-                [placeholder]="'Please input'"
+            <label class="flex min-w-0 flex-col gap-1 font-medium">
+              <span>Country/Region*</span>
+              <select
+                class="profile-select h-[42px] w-full rounded-lg border border-[#d1d5db] bg-[#f9fafb] px-3.5 font-normal focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
                 formControlName="m_country"
-                [error]="fieldError('m_country')"
-              ></app-input>
-              <span
-                class="pointer-events-none absolute top-[42px] right-[19px] block size-1.5 rotate-45 border-r-[1.5px] border-b-[1.5px] border-current"
-                aria-hidden="true"
-              ></span>
-            </div>
+                autocomplete="country-name"
+                required
+                [attr.aria-invalid]="fieldError('m_country') ? 'true' : null"
+                [attr.aria-describedby]="
+                  fieldError('m_country') ? 'edit-profile-country-error' : null
+                "
+                [class.border-red-500]="!!fieldError('m_country')"
+              >
+                @for (country of countries; track country) {
+                  <option [value]="country">{{ country }}</option>
+                }
+              </select>
+              @if (fieldError('m_country'); as error) {
+                <span id="edit-profile-country-error" role="alert" class="font-normal text-red-600">
+                  {{ error }}
+                </span>
+              }
+            </label>
 
             <!-- phone number -->
-            <div>
-              <div class="relative [&_app-input_input]:pl-[110px]">
-                <app-input
-                  [label]="'Phone number*'"
-                  [placeholder]="'123 4567 890'"
-                  formControlName="m_phone"
-                  [error]="fieldError('m_phone')"
-                ></app-input>
-                <span
-                  class="pointer-events-none absolute top-[25px] left-px flex h-10 w-[94px] items-center justify-center gap-2 rounded-l-[7px] border-r border-[#d1d5db] bg-[#f3f4f6]"
-                  aria-hidden="true"
+            <div class="flex min-w-0 flex-col gap-1">
+              <label for="edit-profile-phone" class="font-medium">Phone number*</label>
+              <div
+                class="flex h-[42px] rounded-lg border border-[#d1d5db] bg-[#f9fafb] focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600"
+                [class.border-red-500]="!!fieldError('m_phone')"
+              >
+                <select
+                  class="profile-select shrink-0 rounded-l-lg border-r border-[#d1d5db] bg-[#f3f4f6] px-2.5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600"
+                  formControlName="phoneCode"
+                  aria-label="Country calling code"
+                  autocomplete="tel-country-code"
+                  required
                 >
-                  @if (phoneCode() === '+66') {
-                    <span class="text-base leading-none">TH</span>
+                  @for (code of phoneCodes; track code.value) {
+                    <option [value]="code.value">{{ code.label }}</option>
                   }
-                  <span>{{ phoneCode() }}</span>
-                  <span
-                    class="-mt-[3px] block size-1.5 rotate-45 border-r-[1.5px] border-b-[1.5px] border-current"
-                  ></span>
-                </span>
+                </select>
+                <input
+                  id="edit-profile-phone"
+                  class="w-full min-w-0 rounded-r-lg px-3.5 placeholder:text-gray-500 focus:outline-none"
+                  type="tel"
+                  inputmode="numeric"
+                  autocomplete="tel-national"
+                  placeholder="123456789"
+                  formControlName="m_phone"
+                  required
+                  [attr.aria-invalid]="fieldError('m_phone') ? 'true' : null"
+                  [attr.aria-describedby]="
+                    fieldError('m_phone')
+                      ? 'edit-profile-phone-hint edit-profile-phone-error'
+                      : 'edit-profile-phone-hint'
+                  "
+                />
               </div>
-              <p class="mt-1.5 text-sm leading-5 text-[#6b7280]">Enter a number between 0 and 9</p>
+              @if (fieldError('m_phone'); as error) {
+                <p id="edit-profile-phone-error" role="alert" class="text-red-600">{{ error }}</p>
+              }
+              <p id="edit-profile-phone-hint" class="text-[#6b7280]">Enter digits only.</p>
             </div>
           </ng-container>
 

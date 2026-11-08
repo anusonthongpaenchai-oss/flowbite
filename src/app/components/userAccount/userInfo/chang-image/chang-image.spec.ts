@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import type { AxiosResponse } from 'axios';
-import { api } from '../../../../../shared/api/api';
+import { api, type ApiResponse } from '../../../../../shared/api/api';
 import { clearAuthSession, setAuthSession } from '../../../../../shared/guard/auth';
 import { ChangImage } from './chang-image';
 
@@ -34,7 +33,7 @@ describe('ChangImage', () => {
     });
     createObjectURL.mockReset().mockReturnValue('blob:profile-preview');
     revokeObjectURL.mockReset();
-    upload.mockReset().mockResolvedValue({ status: 200, data: { result: true } } as AxiosResponse);
+    upload.mockReset().mockResolvedValue({ status: 200, data: { result: true } } as ApiResponse);
     vi.spyOn(api, 'post').mockImplementation(upload);
     clearAuthSession();
     setAuthSession({

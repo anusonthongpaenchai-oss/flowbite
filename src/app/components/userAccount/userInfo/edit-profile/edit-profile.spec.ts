@@ -12,6 +12,7 @@ describe('EditProfile', () => {
     m_gender: '',
     m_country: 'Thailand',
   };
+  const memberFields = { ...member, phoneCode: '+66' };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -36,7 +37,7 @@ describe('EditProfile', () => {
   }
 
   async function goToAddress(): Promise<void> {
-    component.editProfileForm.controls.member.setValue(member);
+    component.editProfileForm.controls.member.setValue(memberFields);
     button('Next').click();
     await fixture.whenStable();
   }
@@ -50,13 +51,15 @@ describe('EditProfile', () => {
     ['m_lastname', 'Member'],
     ['m_country', 'Thailand'],
     ['m_phone', '0812345678'],
-  ] as const)('updates member.%s when typing into the input', async (name, value) => {
-    const input = fixture.nativeElement.querySelector(
-      `app-input[formControlName="${name}"] input`,
-    ) as HTMLInputElement;
+    ['m_gender', 'OTHER'],
+  ] as const)('updates member.%s when editing the field', async (name, value) => {
+    const element = fixture.nativeElement as HTMLElement;
+    const input = element.querySelector<HTMLInputElement | HTMLSelectElement>(
+      `[formControlName="${name}"]:is(input, select), app-input[formControlName="${name}"] input`,
+    )!;
 
     input.value = value;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event(input instanceof HTMLSelectElement ? 'change' : 'input'));
     await fixture.whenStable();
 
     expect(component.editProfileForm.controls.member.controls[name].value).toBe(value);
@@ -132,7 +135,7 @@ describe('EditProfile', () => {
 
   it('advances to the address page when submitting the first page with Enter', async () => {
     const submit = vi.spyOn(component, 'onSubmit');
-    component.editProfileForm.controls.member.setValue(member);
+    component.editProfileForm.controls.member.setValue(memberFields);
 
     fixture.nativeElement
       .querySelector('form')
@@ -227,37 +230,76 @@ describe('EditProfile', () => {
     button('Save').click();
     await fixture.whenStable();
 
-    expect(update).toHaveBeenCalledExactlyOnceWith({ member, address });
+    expect(update).toHaveBeenCalledExactlyOnceWith({
+      member: { ...member, m_phone: '+66812345678' },
+      address,
+    });
     expect(component.pg()).toBe(1);
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it('prefills both form pages and displays the existing email as read-only', async () => {
-    fixture = TestBed.createComponent(EditProfile);
-    component = fixture.componentInstance;
-    const address = {
-      address_no: '123 Main Road',
-      address_district: 'Khlong Tan Nuea',
-      address_city: 'Watthana',
-      address_state: 'Bangkok',
-      address_zipcode: '10110',
-    };
-    fixture.componentRef.setInput('profile', { member, address });
-    fixture.componentRef.setInput('email', 'member@example.com');
-    await fixture.whenStable();
+  it.each([
+    ['United States', '+12025550123', '', '+1', '2025550123'],
+    ['Thailand', '66812345678', '+66', '+66', '812345678'],
+    ['Thailand', '+6*****668', '+66', '+66', '+6*****668'],
+    ['United Kingdom', '+12025550123', '+44', '+44', '2025550123'],
+  ])(
+    'prefills a %s profile and displays its email as read-only',
+    async (country, storedPhone, storedCode, phoneCode, nationalNumber) => {
+      fixture = TestBed.createComponent(EditProfile);
+      component = fixture.componentInstance;
+      const address = {
+        address_no: '123 Main Road',
+        address_district: 'Khlong Tan Nuea',
+        address_city: 'Watthana',
+        address_state: 'Bangkok',
+        address_zipcode: '10110',
+      };
+      fixture.componentRef.setInput('profile', {
+        member: { ...member, m_country: country, m_phone: storedPhone },
+        address,
+      });
+      fixture.componentRef.setInput('phoneCode', storedCode);
+      fixture.componentRef.setInput('email', 'member@example.com');
+      await fixture.whenStable();
 
-    expect(component.editProfileForm.getRawValue()).toEqual({ member, address: { address } });
-    const email = fixture.nativeElement.querySelector('input[type="email"]') as HTMLInputElement;
-    expect(email.value).toBe('member@example.com');
-    expect(email.readOnly).toBe(true);
-  });
+      expect(component.editProfileForm.getRawValue()).toEqual({
+        member: {
+          ...memberFields,
+          m_country: country,
+          phoneCode,
+          m_phone: nationalNumber,
+        },
+        address: { address },
+      });
+      const element = fixture.nativeElement as HTMLElement;
+      const options = (name: string) =>
+        [
+          ...element.querySelectorAll<HTMLOptionElement>(
+            `select[formControlName="${name}"] option`,
+          ),
+        ].map((option) => option.value);
+      expect(options('m_gender')).toEqual(['MALE', 'FEMALE', 'OTHER']);
+      expect(options('m_country')).toEqual(['Thailand', 'United Kingdom', 'United States']);
+      expect(options('phoneCode')).toEqual(['+66', '+44', '+1']);
+      expect(
+        element.querySelector<HTMLSelectElement>('select[formControlName="phoneCode"]')!.value,
+      ).toBe(phoneCode);
+      expect(
+        element.querySelector<HTMLSelectElement>('select[formControlName="m_gender"]')!.value,
+      ).toBe('');
+      const email = fixture.nativeElement.querySelector('input[type="email"]') as HTMLInputElement;
+      expect(email.value).toBe('member@example.com');
+      expect(email.readOnly).toBe(true);
+    },
+  );
 
   it.each([
     ['m_name', '   ', 'required'],
     ['m_lastname', 'Member123', 'English letters'],
     ['m_name', 'a'.repeat(101), '100 characters'],
     ['m_phone', '08123abc', '7–15 digits'],
-    ['m_phone', '123456', '7–15 digits'],
+    ['m_phone', '1234', '7–15 digits'],
     ['address_state', '   ', 'required'],
     ['address_zipcode', '10110!', 'postal code'],
   ] as const)('shows a field error for invalid %s', async (name, value, message) => {
@@ -271,18 +313,23 @@ describe('EditProfile', () => {
     control!.markAsTouched();
     fixture.detectChanges();
 
-    const input = fixture.nativeElement.querySelector(`app-input[formControlName="${name}"]`);
-    expect(control!.invalid).toBe(true);
-    expect(input.querySelector('[role="alert"]').textContent).toContain(message);
-    expect(input.querySelector('input').getAttribute('aria-invalid')).toBe('true');
+    const element = fixture.nativeElement as HTMLElement;
+    const input = element.querySelector<HTMLInputElement>(
+      `input[formControlName="${name}"], app-input[formControlName="${name}"] input`,
+    )!;
+    const error =
+      input.closest('app-input')?.querySelector('[role="alert"]') ??
+      element.querySelector('#edit-profile-phone-error');
+    expect(error?.textContent).toContain(message);
+    expect(input.getAttribute('aria-invalid')).toBe('true');
   });
 
   it('normalizes whitespace and retains optional gender in the flat API payload', async () => {
     const update = vi.spyOn(component.updateProfile, 'emit');
     component.editProfileForm.controls.member.setValue({
-      ...member,
+      ...memberFields,
       m_name: ' Test ',
-      m_gender: ' male ',
+      m_gender: ' MALE ',
     });
     component.onNext();
     const address = {
@@ -297,7 +344,7 @@ describe('EditProfile', () => {
     component.onSubmit();
 
     expect(update).toHaveBeenCalledExactlyOnceWith({
-      member: { ...member, m_gender: 'male' },
+      member: { ...member, m_phone: '+66812345678', m_gender: 'MALE' },
       address: {
         address_no: '123 Main Road',
         address_district: 'Khlong Tan Nuea',

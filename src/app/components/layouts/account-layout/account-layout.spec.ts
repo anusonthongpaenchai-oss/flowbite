@@ -3,9 +3,8 @@ import { provideLocationMocks } from '@angular/common/testing';
 import { TestBed } from '@angular/core/testing';
 import { NavigationEnd, provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import type { AxiosResponse } from 'axios';
 import { filter, firstValueFrom } from 'rxjs';
-import { api } from '../../../../shared/api/api';
+import { api, type ApiResponse } from '../../../../shared/api/api';
 import { clearAuthSession, setAuthSession } from '../../../../shared/guard/auth';
 import { routes } from '../../../app.routes';
 import { Login } from '../../../page/login/login';
@@ -53,7 +52,7 @@ describe('AccountLayout', () => {
             url === '/v1/verify/kyc'
               ? { result: true, message: 'KYC retrieved.', data: { kyc_stat: 1 } }
               : { result: true, message: 'Profile retrieved.', data: { member, address: null } },
-        }) as AxiosResponse,
+        }) as ApiResponse,
     );
     vi.spyOn(api, 'get').mockImplementation(getMock);
 

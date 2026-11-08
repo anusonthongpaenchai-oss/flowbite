@@ -1,8 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { AxiosError, type AxiosResponse } from 'axios';
-import { api } from '../../../shared/api/api';
+import { api, ApiError, type ApiResponse } from '../../../shared/api/api';
 import { routes } from '../../app.routes';
 import { Login } from '../login/login';
 import { Signup } from './signup';
@@ -25,8 +24,8 @@ describe('Signup', () => {
     terms: true,
   };
 
-  function successResponse(): AxiosResponse {
-    return { data: { result: true, message: 'Registration successful.' } } as AxiosResponse;
+  function successResponse(): ApiResponse {
+    return { data: { result: true, message: 'Registration successful.' } } as ApiResponse;
   }
 
   beforeEach(async () => {
@@ -201,7 +200,7 @@ describe('Signup', () => {
   });
 
   it('blocks Back navigation and duplicate submissions while a request is pending', async () => {
-    let resolveRequest!: (value: AxiosResponse) => void;
+    let resolveRequest!: (value: ApiResponse) => void;
     postMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -237,7 +236,7 @@ describe('Signup', () => {
   it('preserves form values and reports a registration rejection', async () => {
     postMock.mockResolvedValueOnce({
       data: { result: false, message: 'Email is already registered.' },
-    } as AxiosResponse);
+    } as ApiResponse);
     component.signupForm.setValue(registration);
 
     await component.handleSubmit();
@@ -249,13 +248,13 @@ describe('Signup', () => {
 
   it('reports the backend message for an HTTP error and allows a retry', async () => {
     postMock.mockRejectedValueOnce(
-      new AxiosError('Request failed', AxiosError.ERR_BAD_REQUEST, undefined, undefined, {
+      new ApiError('Request failed', {
         status: 422,
         data: {
           message: 'Registration failed.',
           error: { message: 'Email is already registered.' },
         },
-      } as AxiosResponse),
+      } as ApiResponse),
     );
     component.signupForm.setValue(registration);
 
@@ -272,7 +271,7 @@ describe('Signup', () => {
   });
 
   it('handles a network failure without leaving the form loading', async () => {
-    postMock.mockRejectedValueOnce(new AxiosError('Network Error', AxiosError.ERR_NETWORK));
+    postMock.mockRejectedValueOnce(new ApiError('Network Error'));
     component.signupForm.setValue(registration);
 
     await component.handleSubmit();

@@ -1,6 +1,5 @@
-import { isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
+import { api, isApiError } from '../api';
 
 type SendOtpData = {
   memberRef: string;
@@ -27,7 +26,7 @@ export type ResponseSendSms = {
 };
 
 function requestError(error: unknown, fallback: string): Error {
-  if (isAxiosError<SendOtpError>(error)) {
+  if (isApiError<SendOtpError>(error)) {
     const response = error.response?.data;
     return new Error(response?.error?.message || response?.message || fallback);
   }
