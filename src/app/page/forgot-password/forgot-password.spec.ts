@@ -1,8 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import type { AxiosResponse } from 'axios';
-import { api } from '../../../shared/api/api';
+import { api, type ApiResponse } from '../../../shared/api/api';
 import { clearAuthSession } from '../../../shared/guard/auth';
 import { routes } from '../../app.routes';
 import { Login } from '../login/login';
@@ -14,11 +13,11 @@ describe('ForgotPassword', () => {
   const postMock = vi.fn<typeof api.post>();
   const email = 'member@example.com';
 
-  function successResponse(message = 'Password reset instructions sent.'): AxiosResponse {
+  function successResponse(message = 'Password reset instructions sent.'): ApiResponse {
     return {
       status: 200,
       data: { result: true, message, data: 'reset-reference' },
-    } as AxiosResponse;
+    } as ApiResponse;
   }
 
   function emailInput(): HTMLInputElement {
@@ -122,7 +121,7 @@ describe('ForgotPassword', () => {
   );
 
   it('locks the form and ignores duplicate submissions while a request is pending', async () => {
-    let resolveRequest!: (response: AxiosResponse) => void;
+    let resolveRequest!: (response: ApiResponse) => void;
     postMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -187,7 +186,7 @@ describe('ForgotPassword', () => {
     postMock.mockResolvedValueOnce({
       status: 422,
       data: { message: 'Please try again later.', result: false },
-    } as AxiosResponse);
+    } as ApiResponse);
     component.forgotPasswordForm.controls.email.setValue(email);
 
     await component.onSubmit();
@@ -238,7 +237,7 @@ describe('ForgotPassword', () => {
   it('does not schedule a redirect when a request finishes after leaving the page', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
-    let resolveRequest!: (response: AxiosResponse) => void;
+    let resolveRequest!: (response: ApiResponse) => void;
     postMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {

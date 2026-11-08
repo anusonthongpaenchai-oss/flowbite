@@ -1,6 +1,5 @@
-import { isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
+import { api, isApiError } from '../api';
 
 type DataResponse = {
   secret: string;
@@ -26,7 +25,7 @@ export async function totpSetup(): Promise<TotpResponse> {
     const response = await api.post<TotpResponse>('/v1/verify/totp/setup');
     data = response.data;
   } catch (error) {
-    if (isAxiosError<{ message?: string; error?: { message?: string } }>(error)) {
+    if (isApiError<{ message?: string; error?: { message?: string } }>(error)) {
       throw new Error(
         error.response?.data?.error?.message || error.response?.data?.message || fallback,
       );

@@ -77,13 +77,19 @@ export class UserInfo implements OnInit {
 
   readonly formattedPhone = computed(() => {
     const countryCode = this.phoneCode().replace(/\D/g, '');
-    let number = this.phone().replace(/\D/g, '');
+    const phone = this.phone().trim();
+    const international = phone.startsWith('+');
+    let number = phone.replace(/\D/g, '');
 
     if (!number) {
       return '';
     }
 
-    if (countryCode && number.startsWith(countryCode) && number.length > 10) {
+    if (international && (!countryCode || !number.startsWith(countryCode))) {
+      return `+${number}`;
+    }
+
+    if (countryCode && number.startsWith(countryCode) && (international || number.length > 10)) {
       number = number.slice(countryCode.length);
     }
 

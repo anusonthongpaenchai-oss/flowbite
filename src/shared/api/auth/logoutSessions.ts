@@ -1,5 +1,4 @@
-import { AxiosError, type AxiosResponse, isAxiosError } from 'axios';
-import { api } from '../api';
+import { api, type ApiResponse, isApiError } from '../api';
 import { authGuard, clearAuthSession } from '../../guard/auth';
 
 type Data = {
@@ -21,12 +20,12 @@ export async function logoutSessions(): Promise<void> {
     throw new Error('Please sign in before signing out.');
   }
 
-  let res: AxiosResponse<unknown>;
+  let res: ApiResponse<unknown>;
 
   try {
     res = await api.post<unknown>('/v1/auth/sessions/logout', {}, { validateStatus: () => true });
   } catch (error) {
-    if (isAxiosError(error) && error.code === AxiosError.ERR_BAD_RESPONSE) {
+    if (isApiError(error) && error.invalidJson) {
       throw new Error('The server returned an invalid response. Please try again.');
     }
 

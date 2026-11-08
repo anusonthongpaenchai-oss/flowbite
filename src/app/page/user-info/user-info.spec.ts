@@ -2,8 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { AxiosError, type AxiosResponse } from 'axios';
-import { api } from '../../../shared/api/api';
+import { api, ApiError, type ApiResponse } from '../../../shared/api/api';
 import type { ProfileUpdateRequest } from '../../../shared/api/userInfo/profileUpdate';
 import type { UserInfoResponse } from '../../../shared/api/userInfo/userInfo';
 import { clearAuthSession, getAuthSession, setAuthSession } from '../../../shared/guard/auth';
@@ -68,9 +67,9 @@ describe('UserInfo', () => {
     member: {
       m_name: 'Updated',
       m_lastname: 'Member',
-      m_country: 'Thailand',
-      m_phone: '0899999999',
-      m_gender: 'female',
+      m_country: 'United Kingdom',
+      m_phone: '+442079460958',
+      m_gender: 'FEMALE',
     },
     address: {
       address_no: '456 New Road',
@@ -92,8 +91,8 @@ describe('UserInfo', () => {
     };
   }
 
-  function response(data: UserInfoResponse): AxiosResponse<UserInfoResponse> {
-    return { data, status: 200 } as AxiosResponse<UserInfoResponse>;
+  function response(data: UserInfoResponse): ApiResponse<UserInfoResponse> {
+    return { data, status: 200 } as ApiResponse<UserInfoResponse>;
   }
 
   beforeEach(async () => {
@@ -122,13 +121,13 @@ describe('UserInfo', () => {
     postMock.mockResolvedValue({
       data: { result: true, message: 'Logged out.' },
       status: 200,
-    } as AxiosResponse);
+    } as ApiResponse);
     vi.spyOn(api, 'post').mockImplementation(postMock);
     putMock.mockReset();
     putMock.mockResolvedValue({
       status: 200,
       data: { result: true, message: 'Profile updated.' },
-    } as AxiosResponse);
+    } as ApiResponse);
     vi.spyOn(api, 'put').mockImplementation(putMock);
     clearAuthSession();
     setAuthSession({
@@ -283,7 +282,7 @@ describe('UserInfo', () => {
   });
 
   it('restores device removal in an open popup when a trusted profile finishes loading', async () => {
-    let resolveProfile!: (value: AxiosResponse<UserInfoResponse>) => void;
+    let resolveProfile!: (value: ApiResponse<UserInfoResponse>) => void;
     getMock.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveProfile = resolve;
@@ -471,7 +470,7 @@ describe('UserInfo', () => {
   it.each([false, true])(
     'disables controls and prevents duplicate logout requests (%s)',
     async (removeRememberedDevices) => {
-      let resolveRequest!: (value: AxiosResponse) => void;
+      let resolveRequest!: (value: ApiResponse) => void;
       postMock.mockImplementationOnce(
         () =>
           new Promise((resolve) => {
@@ -508,7 +507,7 @@ describe('UserInfo', () => {
       resolveRequest({
         data: { result: true, message: 'Logged out.' },
         status: 200,
-      } as AxiosResponse);
+      } as ApiResponse);
       await request;
 
       expect(component.isLoggingOut()).toBe(false);
@@ -537,16 +536,16 @@ describe('UserInfo', () => {
         postMock.mockResolvedValueOnce({
           data: { result: false, message: 'Logout rejected.' },
           status: 200,
-        } as AxiosResponse);
+        } as ApiResponse);
       } else if (failure === 'http') {
         postMock.mockResolvedValueOnce({
           data: { result: true, error: { message: 'Logout rejected.' } },
           status: 500,
-        } as AxiosResponse);
+        } as ApiResponse);
       } else if (failure === 'malformed') {
-        postMock.mockResolvedValueOnce({ data: null, status: 200 } as AxiosResponse);
+        postMock.mockResolvedValueOnce({ data: null, status: 200 } as ApiResponse);
       } else if (failure === 'invalid-json') {
-        postMock.mockRejectedValueOnce(new AxiosError('Invalid JSON', AxiosError.ERR_BAD_RESPONSE));
+        postMock.mockRejectedValueOnce(new ApiError('Invalid JSON', undefined, true));
       } else {
         postMock.mockRejectedValueOnce(new Error('Network Error'));
       }
@@ -637,7 +636,8 @@ describe('UserInfo', () => {
         message: 'OTP sent.',
         data: { memberRef: 'cancelled-reference', expiresAt: new Date() },
       },
-    } as AxiosResponse);
+    } as ApiResponse);
+    await fixture.whenStable();
     findButton(element, 'Next').click();
     await fixture.whenStable();
     fillFields(element, { otpCode: '001234' });
@@ -669,7 +669,7 @@ describe('UserInfo', () => {
       element.querySelector<HTMLSelectElement>('select[formControlName="otpMethod"]')!.value,
     ).toBe('sms');
     expect(element.querySelector('[formControlName="otpCode"]')).toBeNull();
-    expect(findButton(element, 'Next').disabled).toBe(false);
+    expect(findButton(element, 'Next').disabled).toBe(true);
     expect(postMock).toHaveBeenCalledOnce();
   });
 
@@ -698,7 +698,8 @@ describe('UserInfo', () => {
       postMock.mockResolvedValueOnce({
         status: 200,
         data: { data: { memberRef: `${method}-reference`, expiresAt: new Date() } },
-      } as AxiosResponse);
+      } as ApiResponse);
+      await harness.fixture.whenStable();
 
       findButton(element, 'Next').click();
       await harness.fixture.whenStable();
@@ -748,11 +749,7 @@ describe('UserInfo', () => {
         m_phone: '0812345678',
       };
       for (const [name, value] of Object.entries(member)) {
-        const input = element.querySelector<HTMLInputElement>(
-          `app-input[formControlName="${name}"] input`,
-        )!;
-        input.value = value;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
+        fillFields(element, { [name]: value });
       }
 
       findButton('Next').click();
@@ -829,7 +826,7 @@ describe('UserInfo', () => {
     input.dispatchEvent(new Event('change'));
     await fixture.whenStable();
     const newImageUrl = 'https://example.com/profile.png';
-    postMock.mockResolvedValueOnce({ status: 200, data: { result: true } } as AxiosResponse);
+    postMock.mockResolvedValueOnce({ status: 200, data: { result: true } } as ApiResponse);
     getMock.mockResolvedValueOnce(
       response({
         ...profile,
@@ -844,7 +841,7 @@ describe('UserInfo', () => {
     expect(url).toBe('/v1/member/profile/image');
     expect(body).toBeInstanceOf(FormData);
     expect((body as FormData).get('profileImage')).toBe(file);
-    expect(config?.headers?.['Content-Type']).toBeNull();
+    expect(config?.validateStatus).toEqual(expect.any(Function));
     expect(getMock).toHaveBeenCalledTimes(2);
     expect(element.querySelector('app-chang-image')).toBeNull();
     expect(element.querySelector('img.profile-avatar')!.getAttribute('src')).toBe(newImageUrl);
@@ -873,12 +870,20 @@ describe('UserInfo', () => {
 
   function fillFields(element: HTMLElement, fields: Record<string, string>): void {
     for (const [name, value] of Object.entries(fields)) {
-      const input = element.querySelector<HTMLInputElement>(
-        name === 'otpCode' ? '.otp-digit' : `app-input[formControlName="${name}"] input`,
+      const input = element.querySelector<HTMLInputElement | HTMLSelectElement>(
+        name === 'otpCode'
+          ? '.otp-digit'
+          : `select[formControlName="${name}"], input[formControlName="${name}"], app-input[formControlName="${name}"] input`,
       )!;
       input.value = value;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(
+        new Event(input instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }),
+      );
     }
+  }
+
+  function fillMemberUpdate(element: HTMLElement): void {
+    fillFields(element, { ...update.member, m_phone: '02079460958', phoneCode: '+44' });
   }
 
   it('prefills the editor with the loaded member, address, email, and phone code', async () => {
@@ -887,8 +892,8 @@ describe('UserInfo', () => {
       'Test',
     );
     expect(
-      element.querySelector<HTMLInputElement>('[formControlName="m_gender"] input')!.value,
-    ).toBe('male');
+      element.querySelector<HTMLSelectElement>('select[formControlName="m_gender"]')!.value,
+    ).toBe('MALE');
     const email = element.querySelector<HTMLInputElement>('input[type="email"]')!;
     expect(email.value).toBe('member@example.com');
     expect(email.readOnly).toBe(true);
@@ -908,7 +913,7 @@ describe('UserInfo', () => {
 
   it('saves from the form through onUpdate and refreshes the displayed profile', async () => {
     const element = await openEditor();
-    fillFields(element, update.member);
+    fillMemberUpdate(element);
     findButton(element, 'Next').click();
     await fixture.whenStable();
     fillFields(element, update.address);
@@ -926,6 +931,7 @@ describe('UserInfo', () => {
     expect(component.isUpdating()).toBe(false);
     expect(component.isEditProfile()).toBe(false);
     expect(component.firstName()).toBe('Updated');
+    expect(component.formattedPhone()).toBe('+442079460958');
     expect(component.address()).toBe('456 New Road');
     expect(component.province()).toBe('Chiang Mai');
     expect(component.updateErrorMessage()).toBe('');
@@ -938,7 +944,7 @@ describe('UserInfo', () => {
     const element = await openEditor();
     findButton(element, 'Next').click();
     await fixture.whenStable();
-    let resolveRequest!: (value: AxiosResponse) => void;
+    let resolveRequest!: (value: ApiResponse) => void;
     putMock.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -963,7 +969,7 @@ describe('UserInfo', () => {
     resolveRequest({
       status: 200,
       data: { result: true, message: 'Profile updated.' },
-    } as AxiosResponse);
+    } as ApiResponse);
     await fixture.whenStable();
 
     expect(component.isUpdating()).toBe(false);
@@ -974,7 +980,7 @@ describe('UserInfo', () => {
     'keeps edits after a %s failure and permits retrying',
     async (failure) => {
       const element = await openEditor();
-      fillFields(element, update.member);
+      fillMemberUpdate(element);
       findButton(element, 'Next').click();
       await fixture.whenStable();
       fillFields(element, update.address);
@@ -985,9 +991,9 @@ describe('UserInfo', () => {
             result: false,
             error: { message: 'Phone is already in use.' },
           },
-        } as AxiosResponse);
+        } as ApiResponse);
       } else {
-        putMock.mockRejectedValueOnce(new AxiosError('Network Error', AxiosError.ERR_NETWORK));
+        putMock.mockRejectedValueOnce(new ApiError('Network Error'));
       }
 
       findButton(element, 'Save').click();

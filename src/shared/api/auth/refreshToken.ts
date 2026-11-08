@@ -1,5 +1,4 @@
-import { AxiosError, isAxiosError } from 'axios';
-import { api } from '../api';
+import { api, isApiError } from '../api';
 
 export type RefreshTokenResponse = {
   result: boolean | string;
@@ -32,7 +31,7 @@ export async function refreshToken(body: { refreshToken: string }): Promise<Refr
       timeout: 15_000,
     });
   } catch (error) {
-    const invalidResponse = isAxiosError(error) && error.code === AxiosError.ERR_BAD_RESPONSE;
+    const invalidResponse = isApiError(error) && error.invalidJson;
     throw new RefreshTokenError(
       invalidResponse
         ? 'The server returned an invalid response. Please try again.'

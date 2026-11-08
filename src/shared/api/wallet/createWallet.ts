@@ -1,5 +1,4 @@
-import { isAxiosError } from 'axios';
-import { api } from '../api';
+import { api, isApiError } from '../api';
 import { getAuthSession } from '../../guard/auth';
 import { checkWalletKyc } from '../../guard/wallet-kyc';
 
@@ -88,7 +87,7 @@ export async function createWallet(request: CreateWalletRequest): Promise<Create
     }
     return response.data;
   } catch (error) {
-    if (isAxiosError<{ message?: string; error?: { message?: string } }>(error)) {
+    if (isApiError<{ message?: string; error?: { message?: string } }>(error)) {
       if (!error.response || error.response.status >= 500) {
         throw new WalletCreationUnconfirmedError(
           'Could not confirm whether the account was opened. Close this window to refresh your accounts before trying again.',

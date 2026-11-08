@@ -35,7 +35,7 @@
         <app-edit-profile
           [profile]="editProfileData()"
           [email]="email()"
-          [phoneCode]="phoneCode() || '+66'"
+          [phoneCode]="phoneCode()"
           [isUpdating]="isUpdating()"
           [serverError]="updateErrorMessage()"
           (backEdit)="closeEditProfile()"

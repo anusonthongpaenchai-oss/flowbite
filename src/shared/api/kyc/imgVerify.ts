@@ -1,6 +1,5 @@
-import { AxiosError, type AxiosResponse, isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
+import { api, type ApiResponse, isApiError } from '../api';
 
 const allowedImageTypes = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const maxImageSize = 5 * 1024 * 1024;
@@ -50,17 +49,16 @@ export async function imgVerify(body: ImgVerifyRequest): Promise<ImgVerifyRespon
   const formData = new FormData();
   formData.append('kycImage', body.kycImage);
   formData.append('kycIdType', body.kycIdType);
-  let response: AxiosResponse<unknown>;
+  let response: ApiResponse<unknown>;
 
   try {
     response = await api.post<unknown>('/v1/verify/kyc/image', formData, {
-      headers: { 'Content-Type': null },
       validateStatus: () => true,
     });
   } catch (error) {
-    if (isAxiosError(error) && error.response) {
+    if (isApiError(error) && error.response) {
       response = error.response;
-    } else if (isAxiosError(error) && error.code === AxiosError.ERR_BAD_RESPONSE) {
+    } else if (isApiError(error) && error.invalidJson) {
       throw new Error('The server returned an invalid response. Please try again.');
     } else {
       throw new Error('Unable to connect. Please check your connection and try again.');

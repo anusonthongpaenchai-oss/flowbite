@@ -1,6 +1,5 @@
-import { isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
+import { api, isApiError } from '../api';
 
 export type OtpVerifyRequest = {
   memberRef: string;
@@ -35,7 +34,7 @@ async function verifyOtp(
     const response = await api.post<OtpApiResponse>(endpoint, body);
     data = response.data;
   } catch (error) {
-    if (isAxiosError<OtpApiResponse>(error)) {
+    if (isApiError<OtpApiResponse>(error)) {
       const response = error.response?.data;
       throw new Error(response?.error?.message || response?.message || fallback);
     }

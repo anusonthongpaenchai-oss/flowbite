@@ -28,14 +28,10 @@ type GetAllWalletResponse = {
 };
 
 export async function getAllWallet(): Promise<GetAllWalletResponse> {
-    if (!authGuard()) {
-        throw new Error('Please sign in to view your profile.');
-    }
+  if (!authGuard()) {
+    throw new Error('Please sign in to view your profile.');
+  }
 
-    try {
-        const response = await api.get<GetAllWalletResponse>('/v1/trading');
-        return response.data;
-    } catch (error) {
-        throw error;
-    }
+  const response = await api.get<GetAllWalletResponse>('/v1/trading');
+  return response.data;
 }

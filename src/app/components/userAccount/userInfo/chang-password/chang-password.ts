@@ -60,6 +60,10 @@ export class ChangPassword implements AfterViewInit, OnDestroy {
         const currentPassword = form.get('currentPassword')?.value;
         const newPassword = form.get('newPassword')?.value;
         const confirmPassword = form.get('confirmPassword')?.value;
+        if (!currentPassword || !newPassword || !confirmPassword) {
+          return { passwordRequired: true };
+        }
+
         const errors = {
           ...(currentPassword === newPassword || currentPassword === confirmPassword
             ? { passwordReuse: true }

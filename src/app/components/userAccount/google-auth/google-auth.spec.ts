@@ -2,8 +2,7 @@ import { Component, input } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { QRCodeComponent } from 'angularx-qrcode';
-import { AxiosError, type AxiosResponse } from 'axios';
-import { api } from '../../../../shared/api/api';
+import { api, ApiError, type ApiResponse } from '../../../../shared/api/api';
 import { clearAuthSession, setAuthSession, type AuthSession } from '../../../../shared/guard/auth';
 import { GoogleAuth } from './google-auth';
 
@@ -29,8 +28,8 @@ describe('GoogleAuth', () => {
   };
   const postMock = vi.fn<typeof api.post>();
 
-  function response(data: unknown): AxiosResponse {
-    return { data, status: 200 } as AxiosResponse;
+  function response(data: unknown): ApiResponse {
+    return { data, status: 200 } as ApiResponse;
   }
 
   function button(text: string): HTMLButtonElement {
@@ -151,7 +150,7 @@ describe('GoogleAuth', () => {
   });
 
   it('prevents duplicate setup and closing while pending', async () => {
-    let resolve!: (value: AxiosResponse) => void;
+    let resolve!: (value: ApiResponse) => void;
     postMock.mockReturnValueOnce(new Promise((complete) => (resolve = complete)));
     component.openVerification();
     const pending = component.enableGoogleAuth();
@@ -171,7 +170,7 @@ describe('GoogleAuth', () => {
     async (kind) => {
       if (kind === 'backend')
         postMock.mockResolvedValueOnce(response({ result: false, message: 'Setup failed.' }));
-      else postMock.mockRejectedValueOnce(new AxiosError('Network Error', AxiosError.ERR_NETWORK));
+      else postMock.mockRejectedValueOnce(new ApiError('Network Error'));
       await setup();
       expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toMatch(
         /Setup failed|Unable to setup/,
@@ -270,7 +269,7 @@ describe('GoogleAuth', () => {
 
   it('blocks duplicate verification and navigation while verifying', async () => {
     await enterVerify();
-    let resolve!: (value: AxiosResponse) => void;
+    let resolve!: (value: ApiResponse) => void;
     postMock.mockReturnValueOnce(new Promise((complete) => (resolve = complete)));
     enterToken('001234');
     const pending = component.verifySetup();
@@ -292,7 +291,7 @@ describe('GoogleAuth', () => {
       await enterVerify();
       if (kind === 'backend')
         postMock.mockResolvedValueOnce(response({ result: false, message: 'Invalid code.' }));
-      else postMock.mockRejectedValueOnce(new AxiosError('Network Error', AxiosError.ERR_NETWORK));
+      else postMock.mockRejectedValueOnce(new ApiError('Network Error'));
       enterToken('012345');
       button('Verify & Complete Setup').click();
       await fixture.whenStable();

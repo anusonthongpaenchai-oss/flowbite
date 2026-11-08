@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { api } from '@shared/api/api';
-import type { AxiosResponse } from 'axios';
+import { api, type ApiResponse } from '@shared/api/api';
 import { CreateAccount } from './create-account';
 
 describe('CreateAccount', () => {
@@ -50,9 +49,9 @@ describe('CreateAccount', () => {
     const response = (leverages: number[]) =>
       ({
         data: { result: true, data: { leverages } },
-      }) as AxiosResponse;
-    let resolveOldRequest!: (value: AxiosResponse) => void;
-    const oldRequest = new Promise<AxiosResponse>((resolve) => (resolveOldRequest = resolve));
+      }) as ApiResponse;
+    let resolveOldRequest!: (value: ApiResponse) => void;
+    const oldRequest = new Promise<ApiResponse>((resolve) => (resolveOldRequest = resolve));
     const get = vi.spyOn(api, 'get').mockResolvedValue(response([50, 500]));
     get.mockResolvedValueOnce(response([500, 2000])).mockReturnValueOnce(oldRequest);
 

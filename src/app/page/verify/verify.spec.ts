@@ -1,8 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
-import { AxiosError, type AxiosResponse } from 'axios';
-import { api } from '../../../shared/api/api';
+import { api, ApiError, type ApiResponse } from '../../../shared/api/api';
 import type { KycResponse } from '../../../shared/api/kyc/getKyc';
 import type { UserInfoResponse } from '../../../shared/api/userInfo/userInfo';
 import {
@@ -80,8 +79,8 @@ describe('Verify KYC flow', () => {
     m_birthdate: '1990-01-15',
   };
 
-  function response(data: unknown, status = 200): AxiosResponse {
-    return { data, status } as AxiosResponse;
+  function response(data: unknown, status = 200): ApiResponse {
+    return { data, status } as ApiResponse;
   }
 
   function kycResponse(status = 3): KycResponse {
@@ -108,7 +107,7 @@ describe('Verify KYC flow', () => {
     };
   }
 
-  function sentOtp(memberRef = 'nested-otp-reference'): AxiosResponse {
+  function sentOtp(memberRef = 'nested-otp-reference'): ApiResponse {
     return response({
       message: 'OTP sent.',
       memberRef: 'unused-top-level-reference',
@@ -116,7 +115,7 @@ describe('Verify KYC flow', () => {
     });
   }
 
-  function uploadedImage(): AxiosResponse {
+  function uploadedImage(): ApiResponse {
     return response({
       result: true,
       message: 'KYC image submitted.',
@@ -124,19 +123,16 @@ describe('Verify KYC flow', () => {
     });
   }
 
-  function backendError(message: string): AxiosError {
-    return new AxiosError(
+  function backendError(message: string): ApiError {
+    return new ApiError(
       'Request failed.',
-      AxiosError.ERR_BAD_REQUEST,
-      undefined,
-      undefined,
       response({ result: false, message: 'Request failed.', error: { code: 'OTP', message } }, 422),
     );
   }
 
   function deferredResponse() {
-    let resolve!: (value: AxiosResponse) => void;
-    const promise = new Promise<AxiosResponse>((complete) => (resolve = complete));
+    let resolve!: (value: ApiResponse) => void;
+    const promise = new Promise<ApiResponse>((complete) => (resolve = complete));
     return { promise, resolve };
   }
 
@@ -502,7 +498,7 @@ describe('Verify KYC flow', () => {
     expect(postMock).toHaveBeenCalledExactlyOnceWith(
       '/v1/verify/kyc/image',
       expect.any(FormData),
-      expect.objectContaining({ headers: { 'Content-Type': null } }),
+      expect.objectContaining({ validateStatus: expect.any(Function) }),
     );
     const body = postMock.mock.calls[0][1] as FormData;
     expect(Array.from(body.keys()).sort()).toEqual(['kycIdType', 'kycImage']);
@@ -1325,7 +1321,7 @@ describe('Verify KYC flow', () => {
       expect(postMock).toHaveBeenCalledExactlyOnceWith(
         '/v1/verify/kyc/image',
         expect.any(FormData),
-        expect.objectContaining({ headers: { 'Content-Type': null } }),
+        expect.objectContaining({ validateStatus: expect.any(Function) }),
       );
       const body = postMock.mock.calls[0][1] as FormData;
       expect(Array.from(body.keys()).sort()).toEqual(['kycIdType', 'kycImage']);
