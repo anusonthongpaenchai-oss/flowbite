@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios';
 import { api } from '../api';
-import { authGuard } from '../../guard/auth';
+import { getAuthSession } from '../../guard/auth';
+import { checkWalletKyc } from '../../guard/wallet-kyc';
 
 export type CreateWalletRequest = {
   wallet_account_type: 1 | 2 | 3 | 4;
@@ -62,10 +63,19 @@ export type CreateWalletResponse = {
 };
 
 export class WalletCreationUnconfirmedError extends Error {}
+export class WalletKycRequiredError extends Error {}
 
 export async function createWallet(request: CreateWalletRequest): Promise<CreateWalletResponse> {
-  if (!authGuard()) {
+  const session = getAuthSession();
+  if (!session) {
     throw new Error('Please sign in to open an account.');
+  }
+  const kyc = await checkWalletKyc();
+  if (kyc === 'wallet-kyc-required') {
+    throw new WalletKycRequiredError('Please complete your identity verification (KYC) first.');
+  }
+  if (kyc !== 'verified' || getAuthSession()?.accessToken !== session.accessToken) {
+    throw new Error('Unable to check identity verification. Please try again.');
   }
 
   const fallback = 'Unable to open an account. Please try again.';

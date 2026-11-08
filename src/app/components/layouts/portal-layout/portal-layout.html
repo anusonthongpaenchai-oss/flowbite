@@ -86,3 +86,11 @@
     </div>
   </div>
 </div>
+
+@if (walletKycNotice(); as notice) {
+  <app-propup-kyc
+    [verificationRequired]="notice === 'wallet-kyc-required'"
+    (confirmed)="confirmIdentity()"
+    (closed)="walletKycNotice.set(null)"
+  />
+}

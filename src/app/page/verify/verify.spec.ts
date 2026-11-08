@@ -38,7 +38,7 @@ describe('Verify KYC flow', () => {
     m_identity: '',
     isActive: 1,
     isConfirm: 1,
-    isKYC: 0,
+    isKYC: 0 as const,
     campaign_name: '',
     lastLogin: '2026-11-03T00:00:00.000Z',
     createdAt: '2026-11-01T00:00:00.000Z',

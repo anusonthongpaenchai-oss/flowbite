@@ -1,5 +1,6 @@
 import { TitleCasePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Button } from '../../components/ui/button/button';
 import { CardWallet } from '../../components/mt5andWallet/card-wallet/card-wallet';
 import {
@@ -23,6 +24,7 @@ import { WalletAccounts } from './wallet-accounts';
   templateUrl: './mt5-wallet.html',
 })
 export class Mt5Wallet {
+  private readonly router = inject(Router);
   private readonly walletAccounts = inject(WalletAccounts);
 
   protected readonly views = [
@@ -71,6 +73,12 @@ export class Mt5Wallet {
     this.accountCreated.set(true);
     this.activeTab.set(null);
     void this.loadAccounts();
+  }
+
+  protected onVerificationRequired(): void {
+    this.accountMode.set(null);
+    this.walletAccounts.reset();
+    void this.router.navigateByUrl('/dashboard', { info: 'wallet-kyc-required' });
   }
 
   protected loadAccounts(): Promise<void> {

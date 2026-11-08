@@ -14,10 +14,12 @@ import { Navbar } from '../../navbar/navbar';
 import { Button } from '../../ui/button/button';
 import { getAuthSession, onAuthSessionChange } from '../../../../shared/guard/auth';
 import { WalletAccounts } from '../../../page/mt5-wallet/wallet-accounts';
+import type { WalletKycNotice } from '../../../../shared/guard/wallet-kyc';
+import { PropupKyc } from '../../propup-kyc/propup-kyc';
 
 @Component({
   selector: 'app-portal-layout',
-  imports: [RouterLink, RouterOutlet, Sidebar, Navbar, Button],
+  imports: [RouterLink, RouterOutlet, Sidebar, Navbar, Button, PropupKyc],
   providers: [WalletAccounts],
   host: { class: 'block min-h-dvh bg-[#f9fafb] text-[#111928]' },
   templateUrl: './portal-layout.html',
@@ -34,6 +36,7 @@ export class PortalLayout {
   readonly collapsed = signal(false);
   readonly desktop = signal(this.desktopQuery?.matches ?? true);
   readonly drawerOpen = signal(false);
+  protected readonly walletKycNotice = signal<WalletKycNotice | null>(null);
   readonly activePage = signal(this.pageFor(this.router.url));
   readonly pageTitle = computed(() => {
     const titles: Record<PortalPage, string> = {
@@ -46,12 +49,17 @@ export class PortalLayout {
 
   constructor() {
     const synchronize = () => {
-      const previousMemberId = this.session()?.member.id;
+      const previousSession = this.session();
       const session = getAuthSession();
       this.session.set(session);
-      if (session?.member.id !== previousMemberId) {
+      if (
+        session?.member.id !== previousSession?.member.id ||
+        session?.sessionUid !== previousSession?.sessionUid
+      ) {
         this.walletAccounts.reset();
-        if (session) void this.walletAccounts.load();
+        if (session && this.activePage() === 'wallet') {
+          void this.router.navigateByUrl('/dashboard', { replaceUrl: true });
+        }
       }
       if (!session) {
         this.closeDrawer();
@@ -77,11 +85,17 @@ export class PortalLayout {
       if (event instanceof NavigationEnd) {
         this.activePage.set(this.pageFor(event.urlAfterRedirects));
         this.closeDrawer();
-        if (this.session() && this.walletAccounts.loadState() === 'idle') {
-          void this.walletAccounts.load();
-        }
+        const info = this.router.lastSuccessfulNavigation()?.extras.info;
+        this.walletKycNotice.set(
+          info === 'wallet-kyc-required' || info === 'wallet-kyc-unavailable' ? info : null,
+        );
       }
     });
+  }
+
+  protected confirmIdentity(): void {
+    this.walletKycNotice.set(null);
+    void this.router.navigateByUrl('/user/verify');
   }
 
   openDrawer(): void {

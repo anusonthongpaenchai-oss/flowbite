@@ -18,7 +18,8 @@ export type MemberData = {
   m_identity: string;
   isActive: number;
   isConfirm: number;
-  isKYC: number;
+  isKYC: 0 | 1;
+  isKyc?: 0 | 1;
   campaign_name: string;
   lastLogin: string;
   createdAt: string;
@@ -46,6 +47,9 @@ export type UserInfoData = {
   member: MemberData;
   address: AddressData | null;
   isTrusted: boolean;
+  id?: number;
+  isKYC?: 0 | 1;
+  isKyc?: 0 | 1;
 };
 
 export type UserInfoResponse = {

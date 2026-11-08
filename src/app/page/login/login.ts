@@ -19,6 +19,7 @@ import { Navbar } from '../../components/navbar/navbar';
 import { login, type LoginData } from '../../../shared/api/auth/login';
 import { twoFaVerify } from '../../../shared/api/2fa/twoFaVerify';
 import { setAuthSession } from '../../../shared/guard/auth';
+import { checkWalletKyc } from '../../../shared/guard/wallet-kyc';
 import { startTokenRefresh } from '../../../shared/services/tokenRefreshScheduler';
 
 @Component({
@@ -174,6 +175,7 @@ export class Login implements OnDestroy {
     if (rememberMe) {
       startTokenRefresh();
     }
+    void checkWalletKyc();
 
     this.clearTwoFaChallenge();
     this.password = '';
