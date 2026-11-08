@@ -19,6 +19,7 @@ import {
   createWallet,
   type CreateWalletRequest,
   WalletCreationUnconfirmedError,
+  WalletKycRequiredError,
 } from '@shared/api/wallet/createWallet';
 import { getWalletLeverages } from '@shared/api/wallet/getWalletLeverages';
 
@@ -39,6 +40,7 @@ export class CreateAccount implements AfterViewInit, OnDestroy {
   readonly type = input.required<WalletMode>();
   readonly closed = output<boolean>();
   readonly created = output<void>();
+  readonly verificationRequired = output<void>();
 
   protected readonly leverageOptions = signal<readonly number[] | null>(null);
   protected readonly leverageLoadFailed = signal(false);
@@ -129,6 +131,11 @@ export class CreateAccount implements AfterViewInit, OnDestroy {
         wallet_account_name: accountName.trim(),
       });
     } catch (error) {
+      if (error instanceof WalletKycRequiredError && !this.destroyRef.destroyed) {
+        this.dialog().nativeElement.close();
+        this.verificationRequired.emit();
+        return;
+      }
       this.needsRefresh.set(error instanceof WalletCreationUnconfirmedError);
       this.errorMessage.set(error instanceof Error ? error.message : 'Unable to open an account.');
       return;

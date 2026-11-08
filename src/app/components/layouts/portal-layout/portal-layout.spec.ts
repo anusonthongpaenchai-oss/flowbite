@@ -38,6 +38,7 @@ describe('PortalLayout and protected routes', () => {
   let harness: RouterTestingHarness;
   let media: MediaQueryList;
   const getMock = vi.fn<typeof api.get>();
+  const profileGetMock = vi.fn<typeof api.get>();
 
   beforeEach(async () => {
     clearAuthSession();
@@ -75,7 +76,17 @@ describe('PortalLayout and protected routes', () => {
                 : { result: true, data: { member, address: null, isTrusted: false } },
         }) as AxiosResponse,
     );
-    vi.spyOn(api, 'get').mockImplementation(getMock);
+    profileGetMock.mockReset().mockResolvedValue({
+      data: {
+        result: true,
+        data: { member: { ...member, isKYC: 1 }, address: null, isTrusted: false },
+      },
+    } as AxiosResponse);
+    vi.spyOn(api, 'get').mockImplementation((url, config) =>
+      url === '/v1/member/profile'
+        ? profileGetMock(url)
+        : getMock(url, ...(config ? [config] : [])),
+    );
     await TestBed.configureTestingModule({
       providers: [provideRouter(routes)],
     }).compileComponents();
@@ -111,6 +122,125 @@ describe('PortalLayout and protected routes', () => {
     await harness.navigateByUrl('/mt5-wallet', Login);
     expect(TestBed.inject(Router).url).toBe('/');
     expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks a direct wallet visit when the profile has not passed KYC', async () => {
+    profileGetMock.mockResolvedValue({
+      data: { result: true, data: { member: { ...member, isKYC: 0 } } },
+    } as AxiosResponse);
+    setAuthSession({ ...session, member: { ...member, isKYC: 1 } });
+    await harness.navigateByUrl('/mt5-wallet', PortalLayout);
+    await harness.fixture.whenStable();
+
+    const element = harness.routeNativeElement!;
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
+    expect(element.querySelector('app-mt5-wallet')).toBeNull();
+    expect(element.querySelector('#wallet-kyc-dialog[open]')).not.toBeNull();
+    expect(profileGetMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
+    expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the KYC popup from the wallet menu, can close it, and confirms via User verify', async () => {
+    profileGetMock.mockResolvedValue({
+      data: { result: true, data: { id: member.id, isKYC: 0 } },
+    } as AxiosResponse);
+    await open();
+    const element = harness.routeNativeElement!;
+    const walletLink = element.querySelector<HTMLAnchorElement>('a[aria-label="MT5 & Wallet"]')!;
+    const popup = () => element.querySelector<HTMLDialogElement>('#wallet-kyc-dialog[open]');
+    const clickPopupButton = (label: string) =>
+      [...popup()!.querySelectorAll('button')]
+        .find((button) => button.textContent?.trim() === label)!
+        .click();
+
+    walletLink.click();
+    await vi.waitFor(() => expect(popup()).not.toBeNull());
+    clickPopupButton('Close');
+    await harness.fixture.whenStable();
+    expect(popup()).toBeNull();
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
+
+    walletLink.click();
+    await vi.waitFor(() => expect(popup()).not.toBeNull());
+    clickPopupButton('Confirm identity');
+    await harness.fixture.whenStable();
+    expect(TestBed.inject(Router).url).toBe('/user/verify');
+    expect(popup()).toBeNull();
+
+    profileGetMock.mockResolvedValue({
+      data: { result: true, data: { member: { ...member, isKYC: 1 } } },
+    } as AxiosResponse);
+    await harness.navigateByUrl('/mt5-wallet', PortalLayout);
+    expect(harness.routeNativeElement!.querySelector('app-mt5-wallet')).not.toBeNull();
+  });
+
+  it('blocks wallet access when the profile cannot be loaded', async () => {
+    profileGetMock.mockRejectedValue(new Error('Profile unavailable'));
+    await open('/mt5-wallet');
+    const element = harness.routeNativeElement!;
+    expect(element.querySelector('#wallet-kyc-dialog[open]')?.textContent).toContain(
+      'Unable to check identity verification',
+    );
+    expect(element.querySelector('app-mt5-wallet')).toBeNull();
+    expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false, 2])('blocks wallet access for unsupported KYC status %s', async (isKyc) => {
+    profileGetMock.mockResolvedValue({
+      data: { result: true, data: { member: { ...member, isKyc } } },
+    } as AxiosResponse);
+    await open('/mt5-wallet');
+
+    const element = harness.routeNativeElement!;
+    expect(element.querySelector('#wallet-kyc-dialog[open]')?.textContent).toContain(
+      'Unable to check identity verification',
+    );
+    expect(element.querySelector('app-mt5-wallet')).toBeNull();
+    expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks the create request and opens the KYC popup if verification changes after entry', async () => {
+    getMock.mockImplementation(
+      async (url) =>
+        ({
+          data: { result: true, data: url === '/v1/trading' ? [] : { leverages: [100] } },
+        }) as AxiosResponse,
+    );
+    const post = vi.spyOn(api, 'post').mockRejectedValue(new Error('Unexpected POST'));
+    await open('/mt5-wallet');
+    const element = harness.routeNativeElement!;
+    await vi.waitFor(() => expect(element.textContent).toContain('No accounts found.'));
+    [...element.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Open Demo Account')!
+      .click();
+    await harness.fixture.whenStable();
+    const dialog = element.querySelector<HTMLDialogElement>('#create-wallet-dialog')!;
+    const selectOption = (name: string) => {
+      const select = dialog.querySelector<HTMLSelectElement>(`select[formControlName="${name}"]`)!;
+      select.selectedIndex = 1;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return select;
+    };
+    selectOption('accountType');
+    await vi.waitFor(() =>
+      expect(
+        dialog.querySelector('select[formControlName="leverage"] option:nth-child(2)')?.textContent,
+      ).toBe('1:100'),
+    );
+    selectOption('leverage');
+    dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+    await harness.fixture.whenStable();
+    profileGetMock.mockResolvedValue({
+      data: { result: true, data: { member: { ...member, isKyc: 0 } } },
+    } as AxiosResponse);
+    dialog.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
+
+    await vi.waitFor(() =>
+      expect(element.querySelector('#wallet-kyc-dialog[open]')).not.toBeNull(),
+    );
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
+    expect(element.querySelector('app-mt5-wallet')).toBeNull();
+    expect(post).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -262,7 +392,7 @@ describe('PortalLayout and protected routes', () => {
     const submit = dialog.querySelector<HTMLButtonElement>('button[type="submit"]')!;
     submit.click();
     dialog.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
-    expect(post).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
     rejectRequest(entry.error);
 
     await vi.waitFor(() =>
@@ -375,7 +505,7 @@ describe('PortalLayout and protected routes', () => {
     expect(table.textContent).not.toContain('Live Alpha');
     await click('All');
     expect(table.tBodies[0].rows).toHaveLength(8);
-    expect(getMock.mock.calls.map(([url]) => url)).toEqual(['/v1/trading', '/v1/trading']);
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
   it('opens wallet details by account number and reveals each password only on request', async () => {
@@ -544,9 +674,6 @@ describe('PortalLayout and protected routes', () => {
   });
 
   it('opens Dashboard with the shared navbar from / when a session already exists', async () => {
-    getMock.mockResolvedValueOnce({
-      data: { result: true, data: [{ id: 1, wallet_type: 'main', wallet_balance: 420 }] },
-    } as AxiosResponse);
     await open('/');
     const element = harness.routeNativeElement!;
     expect(TestBed.inject(Router).url).toBe('/dashboard');
@@ -564,7 +691,7 @@ describe('PortalLayout and protected routes', () => {
     expect(element.querySelectorAll('.navigation-item:disabled')).toHaveLength(11);
     expect(element.querySelectorAll('nav[aria-label="Sidebar"] a')).toHaveLength(3);
     expect(element.querySelector('.balance-summary strong')?.textContent?.trim()).toBe('$3,000');
-    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
+    expect(getMock).not.toHaveBeenCalled();
   });
 
   it.each(protectedUrls.slice(1))(
@@ -600,7 +727,8 @@ describe('PortalLayout and protected routes', () => {
     element.querySelector<HTMLAnchorElement>('a[aria-label="Dashboard"]')!.click();
     await harness.fixture.whenStable();
     expect(TestBed.inject(Router).url).toBe('/dashboard');
-    expect(getMock.mock.calls.map(([url]) => url)).toEqual(['/v1/trading', '/v1/member/profile']);
+    expect(profileGetMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
+    expect(getMock).not.toHaveBeenCalled();
   });
 
   it('checks child routes again when the session has been removed', async () => {
@@ -608,7 +736,7 @@ describe('PortalLayout and protected routes', () => {
     sessionStorage.removeItem('authSession');
     await harness.navigateByUrl('/user-info/crypto-wallet', Login);
     expect(TestBed.inject(Router).url).toBe('/');
-    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
+    expect(getMock).not.toHaveBeenCalled();
   });
 
   it('removes private content on logout and blocks subsequent direct visits', async () => {
@@ -631,7 +759,7 @@ describe('PortalLayout and protected routes', () => {
       status: 200,
       data: { result: true, message: 'Saved.' },
     } as AxiosResponse);
-    getMock.mockRejectedValueOnce(new Error('Reload failed.'));
+    profileGetMock.mockRejectedValueOnce(new Error('Reload failed.'));
     await profile.onUpdate({
       member: {
         m_name: 'Updated',
@@ -659,7 +787,7 @@ describe('PortalLayout and protected routes', () => {
 
   it('refreshes the sidebar avatar after changing the profile image', async () => {
     await open('/user-info');
-    getMock.mockResolvedValueOnce({
+    profileGetMock.mockResolvedValueOnce({
       status: 200,
       data: {
         result: true,

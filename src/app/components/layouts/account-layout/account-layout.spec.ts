@@ -55,11 +55,7 @@ describe('AccountLayout', () => {
               : { result: true, message: 'Profile retrieved.', data: { member, address: null } },
         }) as AxiosResponse,
     );
-    vi.spyOn(api, 'get').mockImplementation((url, config) =>
-      url === '/v1/trading'
-        ? Promise.resolve({ data: { result: true, data: [] } } as AxiosResponse)
-        : getMock(url, config),
-    );
+    vi.spyOn(api, 'get').mockImplementation(getMock);
 
     await TestBed.configureTestingModule({
       providers: [provideRouter(routes), provideLocationMocks()],
