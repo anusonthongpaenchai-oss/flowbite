@@ -112,6 +112,12 @@ describe('Login', () => {
     });
     postMock.mockReset();
     vi.spyOn(api, 'post').mockImplementation(postMock);
+    vi.spyOn(api, 'get').mockResolvedValue(
+      response({
+        result: true,
+        data: { member: sessionData.member, address: null, isTrusted: false },
+      }),
+    );
     localStorage.removeItem('authSession');
     sessionStorage.removeItem('authSession');
 
@@ -243,9 +249,9 @@ describe('Login', () => {
     },
   );
 
-  it('opens Dashboard with its shared navbar before loading the profile from User Account', async () => {
+  it('checks the profile after sign-in and loads the profile when User Account opens', async () => {
     postMock.mockResolvedValueOnce(successfulResponse());
-    const getMock = vi.spyOn(api, 'get').mockImplementationOnce(async () => {
+    const getMock = vi.spyOn(api, 'get').mockImplementation(async () => {
       expect(JSON.parse(sessionStorage.getItem('authSession')!)).toEqual({
         ...sessionData,
         tokenExpiresAt: expect.any(Number),
@@ -279,7 +285,7 @@ describe('Login', () => {
     await harness.fixture.whenStable();
 
     expect(TestBed.inject(Router).url).toBe('/dashboard');
-    expect(getMock).not.toHaveBeenCalled();
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
     expect(harness.routeNativeElement!.querySelector('app-dashboard')).not.toBeNull();
     expect(harness.routeNativeElement!.querySelector('.navbar-title')?.textContent?.trim()).toBe(
       'Dashboard',
@@ -289,7 +295,10 @@ describe('Login', () => {
       .click();
     await harness.fixture.whenStable();
     expect(TestBed.inject(Router).url).toBe('/user-info');
-    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
+    expect(getMock.mock.calls.map(([url]) => url)).toEqual([
+      '/v1/member/profile',
+      '/v1/member/profile',
+    ]);
     const profilePage = harness.routeDebugElement!.query(By.directive(UserInfo))
       .componentInstance as UserInfo;
     expect(profilePage).toBeInstanceOf(UserInfo);

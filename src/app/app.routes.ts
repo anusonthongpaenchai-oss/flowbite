@@ -9,6 +9,7 @@ import { ForgotPassword } from './page/forgot-password/forgot-password';
 import { Verify } from './page/verify/verify';
 import { PortalLayout } from './components/layouts/portal-layout/portal-layout';
 import { Dashboard } from './page/dashboard/dashboard';
+import { walletKycGuard } from './wallet-kyc.guard';
 
 export const routes: Routes = [
   {
@@ -30,6 +31,7 @@ export const routes: Routes = [
       { path: 'dashboard', component: Dashboard },
       {
         path: 'mt5-wallet',
+        canActivate: [walletKycGuard],
         loadComponent: () => import('./page/mt5-wallet/mt5-wallet').then((m) => m.Mt5Wallet),
       },
       { path: 'user-info', component: AccountLayout, children: accountChildRoutes },
