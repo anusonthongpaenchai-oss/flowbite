@@ -22,6 +22,7 @@ import {
   WalletKycRequiredError,
 } from '@shared/api/wallet/createWallet';
 import { getWalletLeverages } from '@shared/api/wallet/getWalletLeverages';
+import { walletAccountTypes } from '../../../../shared/model/wallet-account-types';
 
 export type WalletMode = CreateWalletRequest['wallet_trading_type'];
 type WalletAccountType = CreateWalletRequest['wallet_account_type'];
@@ -44,12 +45,7 @@ export class CreateAccount implements AfterViewInit, OnDestroy {
 
   protected readonly leverageOptions = signal<readonly number[] | null>(null);
   protected readonly leverageLoadFailed = signal(false);
-  protected readonly accountTypes = [
-    { id: 1, label: 'Real' },
-    { id: 2, label: 'PoxPrime DEMO' },
-    { id: 3, label: 'Demo Forex' },
-    { id: 4, label: 'Standard' },
-  ] as const;
+  protected readonly accountTypes = walletAccountTypes;
   protected readonly form = new FormGroup({
     leverage: new FormControl<number | null>({ value: null, disabled: true }, Validators.required),
     accountType: new FormControl<WalletAccountType | null>(null, Validators.required),

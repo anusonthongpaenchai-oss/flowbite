@@ -15,6 +15,7 @@ import { Button } from '@components/ui/button/button';
 import { deleteWallet } from '@shared/api/wallet/deleteWallet';
 import { getWalletId, type WalletResponseData } from '@shared/api/wallet/getWalletId';
 import { getAuthSession } from '@shared/guard/auth';
+import { DepositDemo } from '../deposit-demo/deposit-demo';
 
 const themes = {
   gray: { coin: 'svg/cardWallet/grayCoin.svg', color: '#D1D5DB' },
@@ -43,7 +44,7 @@ function amount(value: number | string | null | undefined): number | null {
 }
 
 @Component({
-  imports: [AlertCard, Button, DecimalPipe],
+  imports: [AlertCard, Button, DecimalPipe, DepositDemo],
   selector: 'app-card-wallet',
   templateUrl: './card-wallet.html',
 })
@@ -51,6 +52,7 @@ export class CardWallet {
   readonly accountNumber = input.required<string>();
   readonly closed = output<void>();
   readonly deleted = output<void>();
+  readonly balanceRefreshRequested = output<void>();
 
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
@@ -70,6 +72,11 @@ export class CardWallet {
   protected readonly confirmingDelete = signal(false);
   protected readonly deleting = signal(false);
   protected readonly deleteError = signal('');
+  protected readonly showDeposit = signal(false);
+  protected readonly canDeposit = computed(() => {
+    const wallet = this.data()?.wallet;
+    return wallet?.wallet_trading_type === 'demo' && !!wallet.wallet_account_no;
+  });
   protected readonly canDelete = computed(() => this.data()?.wallet.wallet_type === 'trading');
   protected readonly theme = computed(
     () => accountThemes[Number(this.data()?.wallet.wallet_account_type)] ?? themes.gray,
@@ -127,7 +134,7 @@ export class CardWallet {
 
   protected close(event?: Event): void {
     event?.preventDefault();
-    if (this.deleting()) return;
+    if (this.deleting() || this.showDeposit()) return;
     this.request?.abort();
     this.data.set(null);
     this.revealed.set({ master: false, investor: false });
@@ -139,6 +146,19 @@ export class CardWallet {
     if (!this.canDelete() || !this.data()?.wallet.wallet_account_no || this.deleting()) return;
     this.deleteError.set('');
     this.confirmingDelete.set(true);
+  }
+
+  protected openDeposit(): void {
+    if (this.canDeposit()) this.showDeposit.set(true);
+  }
+
+  protected closeDeposit(refreshBalance: boolean): void {
+    this.showDeposit.set(false);
+    if (refreshBalance) {
+      this.data.set(null);
+      void this.load();
+      this.balanceRefreshRequested.emit();
+    }
   }
 
   protected async confirmDelete(): Promise<void> {

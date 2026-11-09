@@ -552,7 +552,14 @@ describe('PortalLayout and protected routes', () => {
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
-    page.querySelector<HTMLElement>('article')!.click();
+    const card = page.querySelector('article')!;
+    for (const label of ['Deposit', 'Withdraw']) {
+      const button = [...card.querySelectorAll('button')].find(
+        (item) => item.textContent?.trim() === label,
+      );
+      expect(button?.disabled).toBe(true);
+    }
+    card.click();
     await harness.fixture.whenStable();
 
     expect(getMock).toHaveBeenLastCalledWith('/v1/wallet/user/000738475', expect.anything());
@@ -584,6 +591,208 @@ describe('PortalLayout and protected routes', () => {
     dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
     await harness.fixture.whenStable();
     expect(page.querySelector('app-card-wallet')).toBeNull();
+  });
+
+  async function openDemoDeposit(from: 'wallet details' | 'Add Balance' = 'wallet details') {
+    const wallet = {
+      id: 7,
+      wallet_account_name: 'MT5-000793315',
+      wallet_account_no: '000793315',
+      wallet_type: 'trading',
+      wallet_trading_type: 'demo',
+      wall_account_type: '2',
+      wallet_balance: 500,
+      wallet_status: 1,
+    };
+    getMock
+      .mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as AxiosResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: { wallet } } } as AxiosResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+    const card = page.querySelector('article')!;
+    if (from === 'Add Balance') {
+      const addBalance = [...card.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === 'Add Balance',
+      );
+      expect(addBalance?.disabled).toBe(false);
+      addBalance!.click();
+    } else {
+      card.click();
+    }
+    await harness.fixture.whenStable();
+    const details = page.querySelector<HTMLDialogElement>('app-card-wallet > dialog')!;
+    if (from === 'wallet details') {
+      const depositButton = () =>
+        [...details.querySelectorAll('button')].find(
+          (button) => button.textContent?.trim() === 'Deposit',
+        );
+      await vi.waitFor(() => expect(depositButton()?.disabled).toBe(false));
+      depositButton()!.click();
+      await harness.fixture.whenStable();
+    }
+    const deposit = await vi.waitFor(() => {
+      const dialog = page.querySelector<HTMLDialogElement>('app-deposit-demo dialog');
+      expect(dialog?.open).toBe(true);
+      expect(dialog?.querySelector('form')).not.toBeNull();
+      return dialog!;
+    });
+    const button = (label: string) =>
+      [...deposit.querySelectorAll<HTMLButtonElement>('app-button button')].find(
+        (item) => item.textContent?.trim() === label,
+      )!;
+    return { wallet, page, details, deposit, button };
+  }
+
+  it.each(['Cancel', 'Close deposit', 'Escape'])(
+    'returns to the same wallet without depositing when dismissed with %s',
+    async (action) => {
+      const post = vi.spyOn(api, 'post');
+      const { page, details, deposit, button } = await openDemoDeposit();
+      if (action === 'Escape') {
+        deposit.dispatchEvent(new Event('cancel', { cancelable: true }));
+      } else {
+        button(action).click();
+      }
+      await harness.fixture.whenStable();
+      expect(page.querySelector('app-deposit-demo')).toBeNull();
+      expect(page.querySelector('app-card-wallet > dialog')).toBe(details);
+      expect(details.open).toBe(true);
+      expect(post).not.toHaveBeenCalled();
+    },
+  );
+
+  it('opens only the deposit dialog from Add Balance and returns to the grid on cancel', async () => {
+    const post = vi.spyOn(api, 'post');
+    const { page, deposit, button } = await openDemoDeposit('Add Balance');
+    expect(page.querySelector('app-card-wallet')).toBeNull();
+    expect(page.querySelector('dialog[open]')).toBe(deposit);
+
+    button('Cancel').click();
+    await harness.fixture.whenStable();
+    expect(page.querySelector('dialog')).toBeNull();
+    expect(page.querySelector('article h3')?.textContent).toBe('MT5-000793315');
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('opens the existing live account dialog from the demo wallet card', async () => {
+    const wallet = {
+      id: 7,
+      wallet_account_name: 'Demo wallet',
+      wallet_account_no: '000793315',
+      wallet_type: 'trading',
+      wallet_trading_type: 'demo',
+      wallet_balance: 500,
+      wallet_status: 1,
+    };
+    getMock.mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as AxiosResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+    const openLive = [...page.querySelectorAll<HTMLButtonElement>('article button')].find(
+      (button) => button.textContent?.trim() === 'Open Live',
+    );
+    expect(openLive?.disabled).toBe(false);
+    openLive!.click();
+    await harness.fixture.whenStable();
+    const dialog = page.querySelector<HTMLDialogElement>('app-create-account dialog');
+    expect(dialog?.open).toBe(true);
+    expect(dialog?.querySelector('h2')?.textContent?.trim()).toBe('Open Live Account');
+    expect(page.querySelector('app-card-wallet')).toBeNull();
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
+  });
+
+  it.each(['wallet details', 'Add Balance'] as const)(
+    'deposits the selected demo investment once from %s and reloads wallet balances',
+    async (from) => {
+      let finish!: (value: AxiosResponse) => void;
+      const post = vi.spyOn(api, 'post').mockImplementation(
+        () =>
+          new Promise<AxiosResponse>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const { wallet, page, details, deposit, button } = await openDemoDeposit(from);
+      const accountFields = [...deposit.querySelectorAll<HTMLInputElement>('app-input input')];
+      expect(accountFields.map((input) => input.value)).toEqual([
+        'MT5-000793315',
+        '000793315',
+        'PoxPrime DEMO',
+      ]);
+      expect(accountFields.every((input) => input.disabled)).toBe(true);
+      const investment = deposit.querySelector('select')!;
+      expect(investment.disabled).toBe(false);
+      expect([...investment.options].map((option) => option.textContent?.trim())).toEqual([
+        '$100',
+        '$1,000',
+        '$10,000',
+        '$100,000',
+      ]);
+      expect(investment.value).toBe('100');
+      investment.value = '10000';
+      investment.dispatchEvent(new Event('change', { bubbles: true }));
+      await harness.fixture.whenStable();
+      expect(post).not.toHaveBeenCalled();
+
+      const updated = { ...wallet, wallet_balance: 10_500 };
+      getMock.mockImplementation(
+        async (url) =>
+          ({
+            data: { result: true, data: url === '/v1/trading' ? [updated] : { wallet: updated } },
+          }) as AxiosResponse,
+      );
+      const confirm = button('Confirm');
+      confirm.click();
+      confirm.click();
+      harness.fixture.detectChanges();
+      expect(post).toHaveBeenCalledExactlyOnceWith('/v1/wallet/trade/balance/000793315/deposit', {
+        balance: 10_000,
+        comment: 'Deposit',
+      });
+      expect(confirm.disabled).toBe(true);
+      finish({ data: { result: true, data: { wallet: [updated] } } } as AxiosResponse);
+      await vi.waitFor(() => {
+        expect(page.querySelector('app-deposit-demo')).toBeNull();
+        if (from === 'wallet details') {
+          expect(details.open).toBe(true);
+          expect(details.textContent).toContain('10,500.00');
+        } else {
+          expect(page.querySelector('dialog')).toBeNull();
+          expect(page.querySelector('article')?.textContent).toContain('10,500.00');
+        }
+      });
+      expect(getMock.mock.calls.filter(([url]) => url === '/v1/trading')).toHaveLength(2);
+    },
+  );
+
+  it('keeps the deposit form open after a rejected deposit', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue({
+      data: { result: false, message: 'Deposit rejected.' },
+    } as AxiosResponse);
+    const { deposit, button } = await openDemoDeposit();
+    button('Confirm').click();
+    await vi.waitFor(() => {
+      expect(deposit.open).toBe(true);
+      expect(deposit.querySelector('[role="alert"]')?.textContent).toContain('Deposit rejected.');
+      expect(button('Confirm').disabled).toBe(false);
+    });
+  });
+
+  it('refreshes the balance before allowing another deposit after a lost response', async () => {
+    const post = vi.spyOn(api, 'post').mockRejectedValue(new Error('Connection lost'));
+    const { wallet, details, deposit, button } = await openDemoDeposit();
+    button('Confirm').click();
+    await harness.fixture.whenStable();
+    expect(deposit.querySelector('[role="alert"]')?.textContent).toContain('Could not confirm');
+    expect(button('Confirm').disabled).toBe(true);
+
+    const updated = { ...wallet, wallet_balance: 600 };
+    getMock
+      .mockResolvedValueOnce({ data: { result: true, data: { wallet: updated } } } as AxiosResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: [updated] } } as AxiosResponse);
+    button('Cancel').click();
+    await vi.waitFor(() => expect(details.textContent).toContain('600.00'));
+    expect(post).toHaveBeenCalledTimes(1);
   });
 
   it.each(['main', 'point', 'lot', 'rebase', ''])(

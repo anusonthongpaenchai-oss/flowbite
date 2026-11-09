@@ -1,7 +1,7 @@
 import { api } from '../api';
 import { authGuard } from '../../guard/auth';
 
-type WalletDateDelete = {
+type WalletDataDelete = {
   id: string;
   memberId: number;
   wallet_account_name: string;
@@ -22,7 +22,7 @@ type DeleteWalletResponse = {
   result: boolean;
   message: string;
   data: {
-    wallet: WalletDateDelete[];
+    wallet: WalletDataDelete[];
     mt5_response: {};
   };
   code: number;

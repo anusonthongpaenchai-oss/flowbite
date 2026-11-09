@@ -105,6 +105,8 @@
             <app-wallet-account-card
               [account]="account"
               (detailsRequested)="selectedAccountNumber.set($event)"
+              (addBalanceRequested)="depositAccountNumber.set($event)"
+              (openLiveRequested)="openCreateAccount('live')"
             />
           }
         </div>
@@ -123,7 +125,12 @@
     [accountNumber]="accountNumber"
     (closed)="selectedAccountNumber.set(null)"
     (deleted)="onAccountDeleted()"
+    (balanceRefreshRequested)="loadAccounts()"
   />
+}
+
+@if (depositAccountNumber(); as accountNumber) {
+  <app-deposit-demo [account]="accountNumber" (closed)="closeDeposit($event)" />
 }
 
 @if (accountMode(); as mode) {

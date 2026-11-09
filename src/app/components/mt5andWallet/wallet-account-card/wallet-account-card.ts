@@ -12,6 +12,8 @@ import type { WalletAccount } from '../../../page/mt5-wallet/wallet-account';
 export class WalletAccountCard {
   readonly account = input.required<WalletAccount>();
   readonly detailsRequested = output<string>();
+  readonly addBalanceRequested = output<string>();
+  readonly openLiveRequested = output<void>();
   protected readonly canOpenDetails = computed(() => {
     const number = this.account().number.trim();
     return this.account().status === 1 && !!number && number !== '—';

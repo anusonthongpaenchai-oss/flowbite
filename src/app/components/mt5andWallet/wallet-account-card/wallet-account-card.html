@@ -1,4 +1,5 @@
 @let item = account();
+@let isDemo = item.tradingType === 'demo';
 <article
   class="flex h-full min-w-0 flex-col rounded-2xl border border-gray-100 bg-white p-4"
   [class.cursor-pointer]="canOpenDetails()"
@@ -37,13 +38,23 @@
   </dl>
 
   <div class="mt-auto grid grid-cols-2 gap-3 pt-4" (click)="$event.stopPropagation()">
-    <app-button variant="secondary" size="compact" [disabled]="true">
+    <app-button
+      variant="secondary"
+      size="compact"
+      [disabled]="!isDemo || !canOpenDetails()"
+      (onClick)="addBalanceRequested.emit(item.number.trim())"
+    >
       <img src="/svg/icon/circle-arrow-down.svg" alt="" />
-      Deposit
+      {{ isDemo ? 'Add Balance' : 'Deposit' }}
     </app-button>
-    <app-button variant="secondary" size="compact" [disabled]="true">
-      <img src="/svg/icon/circle-arrow-up.svg" alt="" />
-      Withdraw
+    <app-button
+      variant="secondary"
+      size="compact"
+      [disabled]="!isDemo || item.status !== 1"
+      (onClick)="openLiveRequested.emit()"
+    >
+      <img [src]="isDemo ? '/svg/icon/plus.svg' : '/svg/icon/circle-arrow-up.svg'" alt="" />
+      {{ isDemo ? 'Open Live' : 'Withdraw' }}
     </app-button>
   </div>
 </article>

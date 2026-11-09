@@ -7,6 +7,7 @@ import {
   CreateAccount,
   type WalletMode,
 } from '../../components/mt5andWallet/create-account/create-account';
+import { DepositDemo } from '../../components/mt5andWallet/deposit-demo/deposit-demo';
 import { WalletAccountCard } from '../../components/mt5andWallet/wallet-account-card/wallet-account-card';
 import { WalletAccountTable } from '../../components/mt5andWallet/wallet-account-table/wallet-account-table';
 import { WalletAccounts } from './wallet-accounts';
@@ -17,6 +18,7 @@ import { WalletAccounts } from './wallet-accounts';
     Button,
     CardWallet,
     CreateAccount,
+    DepositDemo,
     TitleCasePipe,
     WalletAccountCard,
     WalletAccountTable,
@@ -36,6 +38,7 @@ export class Mt5Wallet {
   protected readonly loadState = this.walletAccounts.loadState;
   protected readonly accountMode = signal<WalletMode | null>(null);
   protected readonly selectedAccountNumber = signal<string | null>(null);
+  protected readonly depositAccountNumber = signal<string | null>(null);
   protected readonly accountCreated = signal(false);
   private readonly accounts = computed(() =>
     this.walletAccounts
@@ -66,6 +69,11 @@ export class Mt5Wallet {
 
   constructor() {
     void this.loadAccounts();
+  }
+
+  protected closeDeposit(refreshAccounts: boolean): void {
+    this.depositAccountNumber.set(null);
+    if (refreshAccounts) void this.loadAccounts();
   }
 
   protected openCreateAccount(mode: WalletMode): void {

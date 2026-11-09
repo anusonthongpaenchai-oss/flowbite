@@ -47,8 +47,8 @@
           class="row-span-2 w-[clamp(48px,19vw,128px)] object-contain"
         />
         <div class="flex flex-wrap gap-2 pr-8 text-xs font-semibold uppercase">
-          @if (wallet.member_id != null) {
-            <span class="rounded-md bg-gray-100 px-2 py-1">#{{ wallet.member_id }}</span>
+          @if (wallet.wallet_account_no != null) {
+            <span class="rounded-md bg-gray-100 px-2 py-1">#{{ wallet.wallet_account_no }}</span>
           }
           <span class="rounded-md bg-gray-100 px-2 py-1">{{ platform }}</span>
           @if (wallet.wallet_trading_type) {
@@ -149,7 +149,9 @@
       </dl>
 
       <div class="grid grid-cols-2 gap-3 sm:gap-5">
-        <app-button size="compact" [disabled]="true">Deposit</app-button>
+        <app-button size="compact" [disabled]="!canDeposit()" (onClick)="openDeposit()">
+          Deposit
+        </app-button>
         <app-button variant="secondary" size="compact" [disabled]="true"
           >Withdraw/Transfer</app-button
         >
@@ -158,6 +160,9 @@
         >
       </div>
     </div>
+    @if (showDeposit() && canDeposit()) {
+      <app-deposit-demo [account]="wallet" (closed)="closeDeposit($event)" />
+    }
   } @else if (loadFailed()) {
     <div class="grid justify-items-center gap-3 rounded-xl bg-gray-50 p-5 text-sm">
       <p role="alert">Unable to load wallet details.</p>
