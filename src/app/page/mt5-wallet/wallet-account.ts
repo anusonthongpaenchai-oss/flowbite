@@ -8,6 +8,7 @@ export type WalletAccount = {
   number: string;
   tradingType: string;
   type: string;
+  status: number;
   balance: number | null;
   equity: number | null;
   isActiveMainWallet: boolean;
@@ -28,8 +29,9 @@ export function toWalletAccount(wallet: WalletRecord): WalletAccount {
     number: wallet.wallet_account_no || '—',
     tradingType,
     type: type || '—',
+    status: wallet.wallet_status,
     balance: Number.isFinite(balance) ? balance : null,
     equity: Number.isFinite(equity) ? equity : null,
-    isActiveMainWallet: type === 'main' && (wallet.wallet_status ?? wallet.status) !== 0,
+    isActiveMainWallet: type === 'main' && wallet.wallet_status === 1,
   };
 }

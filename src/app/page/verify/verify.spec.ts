@@ -123,9 +123,12 @@ describe('Verify KYC flow', () => {
     });
   }
 
-  function backendError(message: string): ApiError {
-    return new ApiError(
+  function backendError(message: string): AxiosError {
+    return new AxiosError(
       'Request failed.',
+      AxiosError.ERR_BAD_REQUEST,
+      undefined,
+      undefined,
       response({ result: false, message: 'Request failed.', error: { code: 'OTP', message } }, 422),
     );
   }
@@ -901,7 +904,7 @@ describe('Verify KYC flow', () => {
   it('retries email delivery without saving the profile again', async () => {
     await load();
     selectOtpMethod('email');
-    postMock.mockRejectedValueOnce(backendError('Email service unavailable.'));
+    postMock.mockRejectedValueOnce(backendError('Internal error.', 'Email service unavailable.'));
     button('Next')!.click();
     await fixture.whenStable();
 
@@ -958,7 +961,7 @@ describe('Verify KYC flow', () => {
   });
 
   it('retries a failed SMS send without updating the profile again', async () => {
-    postMock.mockRejectedValueOnce(backendError('SMS service unavailable.'));
+    postMock.mockRejectedValueOnce(backendError('Internal error.', 'SMS service unavailable.'));
     await enterOtp();
 
     expect(component.errorMessage()).toBe('SMS service unavailable.');

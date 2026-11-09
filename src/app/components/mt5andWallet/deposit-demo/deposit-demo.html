@@ -1,0 +1,95 @@
+<dialog
+  #dialog
+  aria-labelledby="demo-deposit-title"
+  class="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-[432px] overflow-y-auto overscroll-contain rounded-xl border-0 bg-white text-gray-900 backdrop:bg-black/35"
+  [attr.aria-busy]="submitting() || walletRequest.isLoading()"
+  (cancel)="cancel($event)"
+>
+  <header class="flex min-h-[62px] items-center justify-between border-b border-gray-200 px-5">
+    <h2 id="demo-deposit-title" class="text-base font-bold text-[#10106B]">Deposit</h2>
+    <app-button
+      variant="ghost"
+      size="compact"
+      icon="svg/icon/x.svg"
+      class="-mr-1 [&_img]:opacity-40"
+      [disabled]="submitting()"
+      (onClick)="cancel()"
+    >
+      <span class="sr-only">Close deposit</span>
+    </app-button>
+  </header>
+
+  @if (wallet(); as details) {
+    <form class="p-5" (submit)="confirm($event, investment.value)">
+      <div class="grid gap-5">
+        <app-input label="Account Name" [value]="details.wallet_account_name" [disabled]="true" />
+        <app-input label="Account Number" [value]="details.wallet_account_no" [disabled]="true" />
+        <app-input label="Account Type" [value]="accountType()" [disabled]="true" />
+        <label class="grid gap-2 text-sm font-medium text-gray-900">
+          Investments for trial trading
+          <span class="relative">
+            <select
+              #investment
+              autofocus
+              class="h-10 w-full appearance-none rounded-lg border border-gray-300 bg-white pr-9 pl-3 text-gray-900 focus-visible:outline-2 focus-visible:outline-[#10106B] disabled:cursor-not-allowed"
+              [disabled]="submitting()"
+            >
+              @for (balance of investments; track balance) {
+                <option [value]="balance">
+                  {{ balance | currency: 'USD' : 'symbol' : '1.0-0' : 'en-US' }}
+                </option>
+              }
+            </select>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 12 12"
+              class="pointer-events-none absolute top-1/2 right-4 size-3 -translate-y-1/2 text-gray-400"
+            >
+              <path
+                d="m2 4 4 4 4-4"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+        </label>
+      </div>
+
+      @if (error()) {
+        <p role="alert" class="mt-3 text-sm text-red-600">{{ error() }}</p>
+      }
+
+      <div
+        class="mt-8 flex flex-wrap justify-end gap-2.5 [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-50"
+      >
+        <app-button
+          variant="secondary"
+          class="min-w-24"
+          [disabled]="submitting()"
+          (onClick)="cancel()"
+        >
+          Cancel
+        </app-button>
+        <app-button
+          type="submit"
+          variant="primary"
+          class="min-w-[102px] [&_button:enabled:hover]:brightness-110"
+          [disabled]="submitting() || needsRefresh()"
+        >
+          {{ submitting() ? 'Depositing…' : 'Confirm' }}
+        </app-button>
+      </div>
+    </form>
+  } @else if (walletRequest.error()) {
+    <div class="grid justify-items-center gap-3 p-5 text-sm">
+      <p role="alert">Unable to load demo wallet details.</p>
+      <app-button variant="secondary" size="compact" (onClick)="walletRequest.reload()"
+        >Retry</app-button
+      >
+    </div>
+  } @else {
+    <p role="status" class="p-5 text-center text-sm text-gray-600">Loading wallet details…</p>
+  }
+</dialog>
