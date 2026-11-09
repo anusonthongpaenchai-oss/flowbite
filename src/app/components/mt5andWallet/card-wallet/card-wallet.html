@@ -15,7 +15,7 @@
     @let wallet = details.wallet;
     <div class="grid gap-5">
       <section
-        class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border border-gray-100 p-4"
+        class="relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border border-gray-100 p-4"
         [style.background-image]="gradient()"
         aria-label="Wallet overview"
       >
@@ -46,9 +46,9 @@
           alt=""
           class="row-span-2 w-[clamp(48px,19vw,128px)] object-contain"
         />
-        <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase">
-          @if (wallet.member_id != null) {
-            <span class="rounded-md bg-gray-100 px-2 py-1">#{{ wallet.member_id }}</span>
+        <div class="flex flex-wrap gap-2 pr-8 text-xs font-semibold uppercase">
+          @if (wallet.wallet_account_no != null) {
+            <span class="rounded-md bg-gray-100 px-2 py-1">#{{ wallet.wallet_account_no }}</span>
           }
           <span class="rounded-md bg-gray-100 px-2 py-1">{{ platform }}</span>
           @if (wallet.wallet_trading_type) {
@@ -60,6 +60,17 @@
             <span class="rounded-md bg-gray-100 px-2 py-1">{{ currency() }}</span>
           }
         </div>
+        @if (canDelete()) {
+          <button
+            type="button"
+            aria-label="Delete account"
+            class="absolute right-2 bottom-2 grid size-8 cursor-pointer place-items-center rounded-lg hover:bg-gray-200/60 focus-visible:outline-2 focus-visible:outline-[#1C64F2] disabled:cursor-not-allowed disabled:opacity-50"
+            [disabled]="!wallet.wallet_account_no || deleting()"
+            (click)="requestDelete()"
+          >
+            <img src="svg/icon/trash-outline.svg" alt="" class="size-6" />
+          </button>
+        }
       </section>
 
       <dl class="grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 sm:gap-5">
@@ -85,9 +96,10 @@
               </button>
               <button
                 type="button"
-                class="grid size-7 place-items-center disabled:cursor-not-allowed"
+                class="grid size-7 cursor-pointer place-items-center rounded-md hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-[#1C64F2] disabled:cursor-not-allowed disabled:opacity-50"
                 [attr.aria-label]="'Edit ' + field.name + ' password'"
-                disabled
+                [disabled]="!wallet.wallet_account_no"
+                (click)="editingPassword.set(field)"
               >
                 <img src="svg/icon/edit.svg" alt="" class="size-5" />
               </button>
@@ -127,9 +139,10 @@
           <dd class="self-center">
             <button
               type="button"
-              class="grid size-7 place-items-center disabled:cursor-not-allowed"
+              class="grid size-7 cursor-pointer place-items-center rounded-md hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-[#1C64F2] disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Edit leverage"
-              disabled
+              [disabled]="!wallet.wallet_account_no"
+              (click)="showChangeLeverage.set(true)"
             >
               <img src="svg/icon/edit.svg" alt="" class="size-5" />
             </button>
@@ -138,7 +151,9 @@
       </dl>
 
       <div class="grid grid-cols-2 gap-3 sm:gap-5">
-        <app-button size="compact" [disabled]="true">Deposit</app-button>
+        <app-button size="compact" [disabled]="!canDeposit()" (onClick)="openDeposit()">
+          Deposit
+        </app-button>
         <app-button variant="secondary" size="compact" [disabled]="true"
           >Withdraw/Transfer</app-button
         >
@@ -147,6 +162,19 @@
         >
       </div>
     </div>
+    @if (showDeposit() && canDeposit()) {
+      <app-deposit-demo [account]="wallet" (closed)="closeDeposit($event)" />
+    }
+    @if (showChangeLeverage()) {
+      <app-change-leverage [account]="wallet" (closed)="closeChangeLeverage($event)" />
+    }
+    @if (editingPassword(); as field) {
+      <app-change-password-wallet
+        [account]="wallet"
+        [type]="field.type"
+        (closed)="closeChangePassword(field, $event)"
+      />
+    }
   } @else if (loadFailed()) {
     <div class="grid justify-items-center gap-3 rounded-xl bg-gray-50 p-5 text-sm">
       <p role="alert">Unable to load wallet details.</p>
@@ -156,5 +184,13 @@
     <p role="status" class="rounded-xl bg-gray-50 p-5 text-center text-sm text-gray-600">
       Loading wallet details…
     </p>
+  }
+  @if (confirmingDelete()) {
+    <app-alert-card
+      [pending]="deleting()"
+      [error]="deleteError()"
+      (confirmed)="confirmDelete()"
+      (cancelled)="confirmingDelete.set(false)"
+    />
   }
 </dialog>
