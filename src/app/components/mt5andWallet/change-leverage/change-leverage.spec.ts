@@ -1,6 +1,6 @@
+import { HttpHeaders } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import type { AxiosResponse } from 'axios';
 import { api } from '@shared/api/api';
 import { clearAuthSession, setAuthSession } from '@shared/guard/auth';
 import { CardWallet } from '../card-wallet/card-wallet';
@@ -15,6 +15,7 @@ describe('ChangeLeverage from CardWallet', () => {
   };
   let fixture: ComponentFixture<CardWallet>;
   const optionsPath = '/v1/trading/wallet-type/3/leverages';
+  const ok = { status: 200, statusText: 'OK', headers: new HttpHeaders() };
   const get = vi.fn<typeof api.get>();
   const patch = vi.fn<typeof api.patch>();
 
@@ -50,10 +51,10 @@ describe('ChangeLeverage from CardWallet', () => {
     });
     get.mockReset().mockImplementation(async (url) => {
       if (url === '/v1/wallet/user/000497921') {
-        return { data: { result: true, data: { wallet } } } as AxiosResponse;
+        return { ...ok, data: { result: true, data: { wallet } } };
       }
       if (url === optionsPath) {
-        return { data: { result: true, data: { leverages: [50, 100, 200] } } } as AxiosResponse;
+        return { ...ok, data: { result: true, data: { leverages: [50, 100, 200] } } };
       }
       throw new Error(`Unexpected GET ${url}`);
     });
@@ -100,8 +101,9 @@ describe('ChangeLeverage from CardWallet', () => {
 
   it('loads choices for the wallet type and applies the chosen leverage only on confirmation', async () => {
     patch.mockResolvedValue({
+      ...ok,
       data: { result: true, data: { wallet: { ...wallet, wallet_leverage: 200 } } },
-    } as AxiosResponse);
+    });
     const { card, dialog, select, button, selectLeverage } = await openChangeLeverage();
     const fields = [...dialog.querySelectorAll('input')];
     expect(fields.map(({ value }) => value)).toEqual([
@@ -126,7 +128,7 @@ describe('ChangeLeverage from CardWallet', () => {
     await fixture.whenStable();
 
     expect(patch).toHaveBeenCalledExactlyOnceWith(
-      '/wallet/000497921/change-leverage',
+      '/v1/wallet/user/000497921/leverage',
       { leverage: 200 },
       expect.anything(),
     );
@@ -149,8 +151,9 @@ describe('ChangeLeverage from CardWallet', () => {
 
   it('keeps the selected leverage when the server rejects the change', async () => {
     patch.mockResolvedValue({
+      ...ok,
       data: { result: false, message: 'Leverage change rejected.' },
-    } as AxiosResponse);
+    });
     const { card, dialog, select, button, selectLeverage } = await openChangeLeverage();
     await selectLeverage();
     button('Confirm').click();

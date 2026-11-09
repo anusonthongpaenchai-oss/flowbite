@@ -154,7 +154,7 @@ function sendWithXsrf(request: HttpRequest<unknown>, next: HttpHandlerFn) {
 }
 
 async function request<T>(
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   body: unknown,
   { validateStatus, timeout, signal }: ApiOptions = {},
@@ -230,5 +230,11 @@ export const api = {
   },
   put<T = unknown>(path: string, body: unknown, options?: ApiOptions): Promise<ApiResponse<T>> {
     return request('PUT', path, body, options);
+  },
+  patch<T = unknown>(path: string, body: unknown, options?: ApiOptions): Promise<ApiResponse<T>> {
+    return request('PATCH', path, body, options);
+  },
+  delete<T = unknown>(path: string, options?: ApiOptions): Promise<ApiResponse<T>> {
+    return request('DELETE', path, undefined, options);
   },
 };

@@ -1,6 +1,5 @@
-import { isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
-import { api } from '../api';
+import { api, isApiError } from '../api';
 
 export type PasswordRequest = {
   type: 'main' | 'investor';
@@ -32,7 +31,7 @@ export async function changePasswordWallet(
       body,
     )
     .catch((error: unknown) => {
-      const response = isAxiosError<PasswordResponse>(error) ? error.response?.data : undefined;
+      const response = isApiError<PasswordResponse>(error) ? error.response?.data : undefined;
       throw new Error(response?.error?.message || response?.message || saveError);
     });
 

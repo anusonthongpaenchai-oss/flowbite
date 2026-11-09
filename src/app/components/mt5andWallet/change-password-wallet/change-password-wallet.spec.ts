@@ -1,8 +1,8 @@
+import { HttpHeaders } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { api } from '@shared/api/api';
+import { api, ApiError } from '@shared/api/api';
 import { clearAuthSession, getAuthSession, setAuthSession } from '@shared/guard/auth';
-import { AxiosError, type AxiosResponse } from 'axios';
 import { CardWallet } from '../card-wallet/card-wallet';
 
 describe('Changing a password from CardWallet', () => {
@@ -16,6 +16,7 @@ describe('Changing a password from CardWallet', () => {
 
   let fixture: ComponentFixture<CardWallet>;
   let card: HTMLElement;
+  const ok = { status: 200, statusText: 'OK', headers: new HttpHeaders() };
   const post = vi.fn<typeof api.post>();
 
   beforeEach(async () => {
@@ -41,7 +42,7 @@ describe('Changing a password from CardWallet', () => {
       sessionUid: 'session',
       expiresIn: 3600,
     });
-    vi.spyOn(api, 'get').mockResolvedValue({ data: { result: true, data: { wallet } } });
+    vi.spyOn(api, 'get').mockResolvedValue({ ...ok, data: { result: true, data: { wallet } } });
     vi.spyOn(api, 'post').mockImplementation(post.mockReset());
 
     await TestBed.configureTestingModule({
@@ -111,25 +112,19 @@ describe('Changing a password from CardWallet', () => {
     async ({ method, status }) => {
       const message = 'OTP already sent. Please wait 1 minute before requesting again.';
       const response = {
+        ...ok,
         status,
+        statusText: status === 200 ? 'OK' : 'Too Many Requests',
         data: {
           result: false,
           message,
           error: { code: 'AUTH_ERROR', message: 'Unauthorized invalid or missing token' },
         },
-      } as AxiosResponse;
+      };
       if (status === 200) {
         post.mockResolvedValueOnce(response);
       } else {
-        post.mockRejectedValueOnce(
-          new AxiosError(
-            'Request failed',
-            AxiosError.ERR_BAD_REQUEST,
-            undefined,
-            undefined,
-            response,
-          ),
-        );
+        post.mockRejectedValueOnce(new ApiError('Request failed', response));
       }
 
       const dialog = await openEditor('master');
@@ -158,9 +153,10 @@ describe('Changing a password from CardWallet', () => {
       setAuthSession({ ...session, member });
       const dialog = await openEditor('master');
       vi.mocked(api.get).mockResolvedValueOnce({
+        ...ok,
         data: { result: true, data: { member: { id: 1, [field]: destination } } },
       });
-      post.mockResolvedValueOnce({ data: { data: { memberRef: 'otp-reference' } } });
+      post.mockResolvedValueOnce({ ...ok, data: { data: { memberRef: 'otp-reference' } } });
 
       enter(dialog.querySelector('input[autocomplete="new-password"]')!, 'NewPassword1@');
       const select = dialog.querySelector('select')!;
@@ -186,7 +182,7 @@ describe('Changing a password from CardWallet', () => {
     { expiry: { expiresAt: 1_800_000_060 }, start: '1:00', next: '0:59' },
     { expiry: {}, start: '5:00', next: '4:59' },
   ])('counts down from $start using the OTP response', async ({ expiry, start, next }) => {
-    post.mockResolvedValueOnce({ data: { data: { memberRef: 'otp-reference', ...expiry } } });
+    post.mockResolvedValueOnce({ ...ok, data: { data: { memberRef: 'otp-reference', ...expiry } } });
     const dialog = await openEditor('master');
     enter(dialog.querySelector('input[autocomplete="new-password"]')!, 'NewPassword1@');
     const select = dialog.querySelector('select')!;
@@ -214,7 +210,7 @@ describe('Changing a password from CardWallet', () => {
   });
 
   it('uses the Authenticator code as the password change token', async () => {
-    post.mockResolvedValueOnce({ data: { result: true } });
+    post.mockResolvedValueOnce({ ...ok, data: { result: true } });
     const dialog = await openEditor('master');
     enter(dialog.querySelector('input[autocomplete="new-password"]')!, 'NewPassword1@');
     const select = dialog.querySelector('select')!;
@@ -257,6 +253,7 @@ describe('Changing a password from CardWallet', () => {
     async (label, type, method, title) => {
       post
         .mockResolvedValueOnce({
+          ...ok,
           data: {
             memberRef: 'unused-top-level-reference',
             data: {
@@ -265,8 +262,8 @@ describe('Changing a password from CardWallet', () => {
             },
           },
         })
-        .mockResolvedValueOnce({ data: { result: false, message: 'Invalid OTP.' } })
-        .mockResolvedValueOnce({ data: { result: true } });
+        .mockResolvedValueOnce({ ...ok, data: { result: false, message: 'Invalid OTP.' } })
+        .mockResolvedValueOnce({ ...ok, data: { result: true } });
 
       const dialog = await openEditor(label);
       expect(dialog.open).toBe(true);

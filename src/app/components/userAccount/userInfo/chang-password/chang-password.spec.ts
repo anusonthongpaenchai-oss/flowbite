@@ -27,12 +27,9 @@ describe('ChangPassword', () => {
     });
   }
 
-  function backendError(message: string, responseMessage = 'Request failed.'): AxiosError {
-    return new AxiosError(
+  function backendError(message: string, responseMessage = 'Request failed.'): ApiError {
+    return new ApiError(
       'Request failed',
-      AxiosError.ERR_BAD_REQUEST,
-      undefined,
-      undefined,
       response({ result: false, message: responseMessage, error: { code: 'OTP', message } }, 422),
     );
   }
@@ -336,7 +333,7 @@ describe('ChangPassword', () => {
       postMock.mockRejectedValueOnce(
         failure === 'backend'
           ? backendError('Internal error.', 'Unable to deliver OTP.')
-          : new AxiosError('Network Error', AxiosError.ERR_NETWORK),
+          : new ApiError('Network Error'),
       );
 
       button('Next')!.click();

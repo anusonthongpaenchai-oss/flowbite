@@ -30,7 +30,7 @@ async function requestOtp<T>(method: 'sms' | 'email', fallback: string): Promise
   const { data } = await api
     .post<T & SendOtpStatus>(`/v1/verify/${method}/send`)
     .catch((error: unknown) => {
-      const response = isAxiosError<SendOtpStatus>(error) ? error.response?.data : undefined;
+      const response = isApiError<SendOtpStatus>(error) ? error.response?.data : undefined;
       throw new Error(response?.message || fallback);
     });
 

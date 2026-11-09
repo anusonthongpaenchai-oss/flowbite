@@ -602,8 +602,8 @@ describe('PortalLayout and protected routes', () => {
       wallet_status: 1,
     };
     getMock
-      .mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as AxiosResponse)
-      .mockResolvedValueOnce({ data: { result: true, data: { wallet } } } as AxiosResponse);
+      .mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as ApiResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: { wallet } } } as ApiResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
@@ -682,7 +682,7 @@ describe('PortalLayout and protected routes', () => {
       wallet_balance: 500,
       wallet_status: 1,
     };
-    getMock.mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as AxiosResponse);
+    getMock.mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as ApiResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
@@ -702,10 +702,10 @@ describe('PortalLayout and protected routes', () => {
   it.each(['wallet details', 'Add Balance'] as const)(
     'deposits the selected demo investment once from %s and reloads wallet balances',
     async (from) => {
-      let finish!: (value: AxiosResponse) => void;
+      let finish!: (value: ApiResponse) => void;
       const post = vi.spyOn(api, 'post').mockImplementation(
         () =>
-          new Promise<AxiosResponse>((resolve) => {
+          new Promise<ApiResponse>((resolve) => {
             finish = resolve;
           }),
       );
@@ -736,7 +736,7 @@ describe('PortalLayout and protected routes', () => {
         async (url) =>
           ({
             data: { result: true, data: url === '/v1/trading' ? [updated] : { wallet: updated } },
-          }) as AxiosResponse,
+          }) as ApiResponse,
       );
       const confirm = button('Confirm');
       confirm.click();
@@ -747,7 +747,7 @@ describe('PortalLayout and protected routes', () => {
         comment: 'Deposit',
       });
       expect(confirm.disabled).toBe(true);
-      finish({ data: { result: true, data: { wallet: [updated] } } } as AxiosResponse);
+      finish({ data: { result: true, data: { wallet: [updated] } } } as ApiResponse);
       await vi.waitFor(() => {
         expect(page.querySelector('app-deposit-demo')).toBeNull();
         if (from === 'wallet details') {
@@ -765,7 +765,7 @@ describe('PortalLayout and protected routes', () => {
   it('keeps the deposit form open after a rejected deposit', async () => {
     vi.spyOn(api, 'post').mockResolvedValue({
       data: { result: false, message: 'Deposit rejected.' },
-    } as AxiosResponse);
+    } as ApiResponse);
     const { deposit, button } = await openDemoDeposit();
     button('Confirm').click();
     await vi.waitFor(() => {
@@ -785,8 +785,8 @@ describe('PortalLayout and protected routes', () => {
 
     const updated = { ...wallet, wallet_balance: 600 };
     getMock
-      .mockResolvedValueOnce({ data: { result: true, data: { wallet: updated } } } as AxiosResponse)
-      .mockResolvedValueOnce({ data: { result: true, data: [updated] } } as AxiosResponse);
+      .mockResolvedValueOnce({ data: { result: true, data: { wallet: updated } } } as ApiResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: [updated] } } as ApiResponse);
     button('Cancel').click();
     await vi.waitFor(() => expect(details.textContent).toContain('600.00'));
     expect(post).toHaveBeenCalledTimes(1);
@@ -803,10 +803,10 @@ describe('PortalLayout and protected routes', () => {
       };
       const remove = vi.spyOn(api, 'delete');
       getMock
-        .mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as AxiosResponse)
+        .mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as ApiResponse)
         .mockResolvedValueOnce({
           data: { result: true, data: { wallet: { ...wallet, wallet_type: type } } },
-        } as AxiosResponse);
+        } as ApiResponse);
       await open('/mt5-wallet');
       const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
       await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
@@ -834,11 +834,11 @@ describe('PortalLayout and protected routes', () => {
       .mockResolvedValueOnce({
         status: 200,
         data: { result: true, data: [wallet] },
-      } as AxiosResponse)
+      } as ApiResponse)
       .mockResolvedValueOnce({
         status: 200,
         data: { result: true, data: { wallet } },
-      } as AxiosResponse);
+      } as ApiResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
@@ -883,10 +883,10 @@ describe('PortalLayout and protected routes', () => {
   );
 
   it('deletes the selected wallet only after confirmation and refreshes the list', async () => {
-    let finish!: (value: AxiosResponse) => void;
+    let finish!: (value: ApiResponse) => void;
     const remove = vi.spyOn(api, 'delete').mockImplementation(
       () =>
-        new Promise<AxiosResponse>((resolve) => {
+        new Promise<ApiResponse>((resolve) => {
           finish = resolve;
         }),
     );
@@ -903,7 +903,7 @@ describe('PortalLayout and protected routes', () => {
     harness.fixture.detectChanges();
     expect(confirmation.open).toBe(true);
     expect(details.open).toBe(true);
-    finish({ status: 200, data: { result: true, data: {} } } as AxiosResponse);
+    finish({ status: 200, data: { result: true, data: {} } } as ApiResponse);
     await vi.waitFor(() => {
       expect(page.querySelector('app-card-wallet')).toBeNull();
       expect(page.querySelector('article')).toBeNull();
@@ -922,9 +922,9 @@ describe('PortalLayout and protected routes', () => {
         remove.mockResolvedValueOnce({
           status: 200,
           data: { result: false, message: 'Account cannot be deleted.' },
-        } as AxiosResponse);
+        } as ApiResponse);
       }
-      remove.mockResolvedValueOnce({ status: 200, data: { result: true } } as AxiosResponse);
+      remove.mockResolvedValueOnce({ status: 200, data: { result: true } } as ApiResponse);
       const { page, details, confirmation, button } = await openDeleteWallet();
       button('Yes, delete').click();
       await harness.fixture.whenStable();

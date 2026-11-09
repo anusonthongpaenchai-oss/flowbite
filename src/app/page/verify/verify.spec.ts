@@ -123,13 +123,10 @@ describe('Verify KYC flow', () => {
     });
   }
 
-  function backendError(message: string): AxiosError {
-    return new AxiosError(
+  function backendError(message: string, responseMessage = 'Request failed.'): ApiError {
+    return new ApiError(
       'Request failed.',
-      AxiosError.ERR_BAD_REQUEST,
-      undefined,
-      undefined,
-      response({ result: false, message: 'Request failed.', error: { code: 'OTP', message } }, 422),
+      response({ result: false, message: responseMessage, error: { code: 'OTP', message } }, 422),
     );
   }
 
