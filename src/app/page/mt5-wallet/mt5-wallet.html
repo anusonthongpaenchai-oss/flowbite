@@ -119,7 +119,11 @@
 </section>
 
 @if (selectedAccountNumber(); as accountNumber) {
-  <app-card-wallet [accountNumber]="accountNumber" (closed)="selectedAccountNumber.set(null)" />
+  <app-card-wallet
+    [accountNumber]="accountNumber"
+    (closed)="selectedAccountNumber.set(null)"
+    (deleted)="onAccountDeleted()"
+  />
 }
 
 @if (accountMode(); as mode) {

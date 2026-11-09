@@ -268,6 +268,7 @@ describe('PortalLayout and protected routes', () => {
       wallet_type: 'trading',
       wallet_trading_type: entry.type,
       wallet_balance: 0,
+      wallet_status: 1,
     };
     getMock
       .mockResolvedValueOnce({ data: { result: true, data: [] } } as AxiosResponse)
@@ -410,7 +411,7 @@ describe('PortalLayout and protected routes', () => {
     }
   });
 
-  it('builds tabs from the returned trading types and filters both views', async () => {
+  it('filters wallets by status and type and makes inactive wallets read-only in both views', async () => {
     await open();
     const element = harness.routeNativeElement!;
     const wallet = (id: number, name: string, type: string, tradingType: string, status = 1) => ({
@@ -435,14 +436,22 @@ describe('PortalLayout and protected routes', () => {
         result: true,
         message: '',
         data: [
-          wallet(1, 'Live Alpha', 'main', ' LIVE ', 0),
-          wallet(2, 'Funded Beta', 'main', 'funded'),
+          wallet(1, 'Live Alpha', 'trading', ' LIVE '),
+          wallet(2, 'Funded Beta', 'trading', 'funded'),
           wallet(3, 'Main Gamma', 'main', 'wallet'),
-          wallet(4, 'Closed Delta', 'trading', 'inactive'),
+          wallet(4, 'Closed Delta', 'trading', 'live', 0),
           wallet(5, 'Archived Wallet', 'main', 'inactive', 0),
-          wallet(6, 'Legacy Wallet', 'trading', 'main'),
-          wallet(7, 'Uncategorized', 'main', '', 0),
+          wallet(6, 'Deleted Wallet', 'trading', 'deleted', 2),
+          wallet(7, 'Uncategorized', 'trading', '', 0),
           wallet(8, 'Funded Echo', 'trading', ' FUNDED '),
+          wallet(9, 'Points', 'point', 'point'),
+          wallet(10, 'Lots', 'lot', 'lot', 0),
+          wallet(11, 'Rebase', 'rebase', 'rebase'),
+          wallet(12, 'Deleted Main', 'main', 'wallet', 2),
+          wallet(13, 'Live Bonus', 'bonus', 'live'),
+          wallet(14, 'Demo Bonus', 'bonus', 'demo'),
+          wallet(15, 'Demo Account', 'trading', 'demo'),
+          wallet(16, 'Other Category', 'bonus', 'other'),
         ],
       },
     } as AxiosResponse);
@@ -463,9 +472,8 @@ describe('PortalLayout and protected routes', () => {
       'All',
       'Live',
       'Funded',
-      'Wallet',
+      'Demo',
       'Inactive',
-      'Main',
     ]);
     expect(tabButtons[0].getAttribute('aria-pressed')).toBe('true');
     const click = async (label: string) => {
@@ -477,34 +485,39 @@ describe('PortalLayout and protected routes', () => {
     const visibleCards = () =>
       [...walletPage.querySelectorAll('article h3')].map((title) => title.textContent?.trim());
 
-    expect(visibleCards()).toEqual([
-      'Live Alpha',
-      'Funded Beta',
-      'Main Gamma',
-      'Closed Delta',
-      'Archived Wallet',
-      'Legacy Wallet',
-      'Uncategorized',
-      'Funded Echo',
-    ]);
+    expect(visibleCards()).toEqual(['Live Alpha', 'Funded Beta', 'Funded Echo', 'Demo Account']);
     expect(walletPage.textContent).toContain('$0');
     for (const [label, names] of [
       ['Live', ['Live Alpha']],
       ['Funded', ['Funded Beta', 'Funded Echo']],
-      ['Wallet', ['Main Gamma']],
-      ['Main', ['Legacy Wallet']],
-      ['Inactive', ['Closed Delta', 'Archived Wallet']],
+      ['Demo', ['Demo Account']],
+      ['Inactive', ['Closed Delta', 'Uncategorized']],
     ] as const) {
       await click(label);
       expect(visibleCards()).toEqual(names);
     }
+    for (const card of walletPage.querySelectorAll('article')) {
+      expect([...card.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+      card.click();
+    }
+    await harness.fixture.whenStable();
+    expect(walletPage.querySelector('app-card-wallet')).toBeNull();
     await click('Table View');
     const table = walletPage.querySelector('table')!;
     expect(table.tBodies[0].rows).toHaveLength(2);
     expect(table.textContent).toContain('0004');
     expect(table.textContent).not.toContain('Live Alpha');
+    expect(table.querySelector('tbody button')).toBeNull();
+    table.tBodies[0].rows[0].click();
+    await harness.fixture.whenStable();
+    expect(walletPage.querySelector('app-card-wallet')).toBeNull();
     await click('All');
-    expect(table.tBodies[0].rows).toHaveLength(8);
+    expect(table.tBodies[0].rows).toHaveLength(4);
+    expect(table.textContent).not.toContain('Live Bonus');
+    expect(table.textContent).not.toContain('Demo Bonus');
+    expect(table.textContent).not.toContain('Closed Delta');
+    expect(table.textContent).not.toContain('Deleted Wallet');
+    expect(table.querySelectorAll('tbody button')).toHaveLength(4);
     expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
@@ -516,6 +529,7 @@ describe('PortalLayout and protected routes', () => {
       wallet_type: 'trading',
       wallet_trading_type: 'live',
       wallet_account_type: 4,
+      wallet_status: 1,
       member_id: 14966,
       wallet_balance: 98000.07,
       wallet_currency: 'USC',
@@ -572,9 +586,169 @@ describe('PortalLayout and protected routes', () => {
     expect(page.querySelector('app-card-wallet')).toBeNull();
   });
 
+  it.each(['main', 'point', 'lot', 'rebase', ''])(
+    'does not offer deletion when wallet details have type %s',
+    async (type) => {
+      const wallet = {
+        id: 7,
+        wallet_account_no: '000738475',
+        wallet_type: 'trading',
+        wallet_status: 1,
+      };
+      const remove = vi.spyOn(api, 'delete');
+      getMock
+        .mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as AxiosResponse)
+        .mockResolvedValueOnce({
+          data: { result: true, data: { wallet: { ...wallet, wallet_type: type } } },
+        } as AxiosResponse);
+      await open('/mt5-wallet');
+      const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+      await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+      page.querySelector<HTMLElement>('article')!.click();
+      await vi.waitFor(() =>
+        expect(page.querySelector('[aria-label="Wallet overview"]')).not.toBeNull(),
+      );
+      expect(page.querySelector('[aria-label="Delete account"]')).toBeNull();
+      expect(page.querySelector('app-alert-card')).toBeNull();
+      expect(remove).not.toHaveBeenCalled();
+    },
+  );
+
+  async function openDeleteWallet() {
+    const wallet = {
+      id: 7,
+      wallet_account_no: '000738475',
+      wallet_account_name: 'Trading account',
+      wallet_type: 'trading',
+      wallet_trading_type: 'live',
+      wallet_balance: 0,
+      wallet_status: 1,
+    };
+    getMock
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { result: true, data: [wallet] },
+      } as AxiosResponse)
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { result: true, data: { wallet } },
+      } as AxiosResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+    page.querySelector<HTMLElement>('article')!.click();
+    await harness.fixture.whenStable();
+    const details = page.querySelector<HTMLDialogElement>('app-card-wallet > dialog')!;
+    await vi.waitFor(() =>
+      expect(details.querySelector('[aria-label="Wallet overview"]')).not.toBeNull(),
+    );
+    const trash = details.querySelector<HTMLButtonElement>('[aria-label="Delete account"]');
+    expect(trash).not.toBeNull();
+    trash!.click();
+    await harness.fixture.whenStable();
+    const confirmation = page.querySelector<HTMLDialogElement>('app-alert-card dialog')!;
+    expect(confirmation.open).toBe(true);
+    const button = (label: string) =>
+      [...confirmation.querySelectorAll('button')].find(
+        (item) => item.textContent?.trim() === label,
+      )!;
+    return { page, details, confirmation, button };
+  }
+
+  it.each(['Cancel', 'Close', 'Escape'])(
+    'keeps wallet details open without deleting when confirmation is dismissed with %s',
+    async (action) => {
+      const remove = vi.spyOn(api, 'delete');
+      const { page, details, confirmation, button } = await openDeleteWallet();
+      expect(remove).not.toHaveBeenCalled();
+      if (action === 'Escape') {
+        confirmation.dispatchEvent(new Event('cancel', { cancelable: true }));
+      } else if (action === 'Close') {
+        confirmation.querySelector<HTMLButtonElement>('[aria-label="Cancel deletion"]')!.click();
+      } else {
+        button('Cancel').click();
+      }
+      await harness.fixture.whenStable();
+      expect(page.querySelector('app-alert-card')).toBeNull();
+      expect(details.open).toBe(true);
+      expect(page.querySelector('article')).not.toBeNull();
+      expect(remove).not.toHaveBeenCalled();
+    },
+  );
+
+  it('deletes the selected wallet only after confirmation and refreshes the list', async () => {
+    let finish!: (value: AxiosResponse) => void;
+    const remove = vi.spyOn(api, 'delete').mockImplementation(
+      () =>
+        new Promise<AxiosResponse>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { page, details, confirmation, button } = await openDeleteWallet();
+    const confirm = button('Yes, delete');
+    confirm.click();
+    confirm.click();
+    // Flush rendering without awaiting the deliberately pending API response.
+    harness.fixture.detectChanges();
+    expect(remove).toHaveBeenCalledExactlyOnceWith('/v1/wallet/user/000738475');
+    expect(confirm.disabled).toBe(true);
+    expect(button('Cancel').disabled).toBe(true);
+    confirmation.dispatchEvent(new Event('cancel', { cancelable: true }));
+    harness.fixture.detectChanges();
+    expect(confirmation.open).toBe(true);
+    expect(details.open).toBe(true);
+    finish({ status: 200, data: { result: true, data: {} } } as AxiosResponse);
+    await vi.waitFor(() => {
+      expect(page.querySelector('app-card-wallet')).toBeNull();
+      expect(page.querySelector('article')).toBeNull();
+      expect(page.textContent).toContain('No accounts found.');
+    });
+    expect(getMock.mock.calls.filter(([url]) => url === '/v1/trading')).toHaveLength(2);
+  });
+
+  it.each(['rejected request', 'unsuccessful result'])(
+    'preserves the wallet and allows retry after a %s',
+    async (failure) => {
+      const remove = vi.spyOn(api, 'delete');
+      if (failure === 'rejected request') {
+        remove.mockRejectedValueOnce(new Error('Network failed'));
+      } else {
+        remove.mockResolvedValueOnce({
+          status: 200,
+          data: { result: false, message: 'Account cannot be deleted.' },
+        } as AxiosResponse);
+      }
+      remove.mockResolvedValueOnce({ status: 200, data: { result: true } } as AxiosResponse);
+      const { page, details, confirmation, button } = await openDeleteWallet();
+      button('Yes, delete').click();
+      await harness.fixture.whenStable();
+      expect(confirmation.querySelector('[role="alert"]')?.textContent?.trim()).toBeTruthy();
+      expect(details.open).toBe(true);
+      expect(page.querySelector('article')).not.toBeNull();
+      expect(button('Yes, delete').disabled).toBe(false);
+      button('Yes, delete').click();
+      await harness.fixture.whenStable();
+      expect(page.querySelector('app-card-wallet')).toBeNull();
+      expect(page.querySelector('article')).toBeNull();
+      expect(remove).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it('opens the existing wallet detail dialog for the selected table row', async () => {
-    const first = { id: 1, wallet_account_no: '0001', wallet_account_name: 'First account' };
-    const selected = { id: 2, wallet_account_no: '0002', wallet_account_name: 'Second account' };
+    const first = {
+      id: 1,
+      wallet_account_no: '0001',
+      wallet_account_name: 'First account',
+      wallet_type: 'trading',
+      wallet_status: 1,
+    };
+    const selected = {
+      id: 2,
+      wallet_account_no: '0002',
+      wallet_account_name: 'Second account',
+      wallet_type: 'trading',
+      wallet_status: 1,
+    };
     getMock
       .mockResolvedValueOnce({
         status: 200,
@@ -624,7 +798,7 @@ describe('PortalLayout and protected routes', () => {
       [...page.querySelectorAll('[aria-label="Account type"] button')].map((button) =>
         button.textContent?.trim(),
       ),
-    ).toEqual(['All']);
+    ).toEqual(['All', 'Inactive']);
   });
 
   it('shows the wallet total as unavailable when a main wallet has no balance', async () => {
@@ -655,9 +829,8 @@ describe('PortalLayout and protected routes', () => {
     } as AxiosResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
-    await vi.waitFor(() =>
-      expect(page.querySelector('article h3')?.textContent).toBe('Main Wallet'),
-    );
+    await vi.waitFor(() => expect(page.textContent).toContain('No accounts found.'));
+    expect(page.querySelector('article')).toBeNull();
     expect(page.textContent?.replace(/\s+/g, ' ')).toContain('— USD');
   });
 

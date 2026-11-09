@@ -37,21 +37,31 @@ export class Mt5Wallet {
   protected readonly accountMode = signal<WalletMode | null>(null);
   protected readonly selectedAccountNumber = signal<string | null>(null);
   protected readonly accountCreated = signal(false);
-  private readonly accounts = this.walletAccounts.accounts;
+  private readonly accounts = computed(() =>
+    this.walletAccounts
+      .accounts()
+      .filter(
+        ({ type, status }) =>
+          !['main', 'point', 'lot', 'rebase'].includes(type) && (status === 0 || status === 1),
+      ),
+  );
   protected readonly walletBalanceLabel = this.walletAccounts.balanceLabel;
 
   protected readonly tabs = computed(() => {
     const tradingTypes = this.accounts()
+      .filter(({ status, type }) => status === 1 && type === 'trading')
       .map(({ tradingType }) => tradingType)
-      .filter(Boolean);
-    return [null, ...new Set(tradingTypes)];
+      .filter((type) => !!type && type !== 'inactive');
+    return [null, ...new Set(tradingTypes), 'inactive'];
   });
 
   protected readonly visibleAccounts = computed(() => {
     const tab = this.activeTab();
-    return tab === null
-      ? this.accounts()
-      : this.accounts().filter(({ tradingType }) => tradingType === tab);
+    return this.accounts().filter(({ status, type, tradingType }) =>
+      tab === 'inactive' && type === 'trading'
+        ? status === 0
+        : status === 1 && type === 'trading' && (tab === null || tradingType === tab),
+    );
   });
 
   constructor() {
@@ -79,6 +89,12 @@ export class Mt5Wallet {
     this.accountMode.set(null);
     this.walletAccounts.reset();
     void this.router.navigateByUrl('/dashboard', { info: 'wallet-kyc-required' });
+  }
+
+  protected onAccountDeleted(): void {
+    this.accountCreated.set(false);
+    this.activeTab.set(null);
+    void this.loadAccounts();
   }
 
   protected loadAccounts(): Promise<void> {

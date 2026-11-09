@@ -1,6 +1,18 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, ElementRef, input, output, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  DestroyRef,
+  ElementRef,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { AlertCard } from '@components/alert-card/alert-card';
 import { Button } from '@components/ui/button/button';
+import { deleteWallet } from '@shared/api/wallet/deleteWallet';
 import { getWalletId, type WalletResponseData } from '@shared/api/wallet/getWalletId';
 import { getAuthSession } from '@shared/guard/auth';
 
@@ -31,14 +43,16 @@ function amount(value: number | string | null | undefined): number | null {
 }
 
 @Component({
-  imports: [Button, DecimalPipe],
+  imports: [AlertCard, Button, DecimalPipe],
   selector: 'app-card-wallet',
   templateUrl: './card-wallet.html',
 })
 export class CardWallet {
   readonly accountNumber = input.required<string>();
   readonly closed = output<void>();
+  readonly deleted = output<void>();
 
+  private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   private request?: AbortController;
   private readonly member = getAuthSession()?.member;
@@ -53,6 +67,10 @@ export class CardWallet {
   protected readonly revealed = signal({ master: false, investor: false });
   protected readonly data = signal<WalletResponseData | null>(null);
   protected readonly loadFailed = signal(false);
+  protected readonly confirmingDelete = signal(false);
+  protected readonly deleting = signal(false);
+  protected readonly deleteError = signal('');
+  protected readonly canDelete = computed(() => this.data()?.wallet.wallet_type === 'trading');
   protected readonly theme = computed(
     () => accountThemes[Number(this.data()?.wallet.wallet_account_type)] ?? themes.gray,
   );
@@ -109,11 +127,43 @@ export class CardWallet {
 
   protected close(event?: Event): void {
     event?.preventDefault();
+    if (this.deleting()) return;
     this.request?.abort();
     this.data.set(null);
     this.revealed.set({ master: false, investor: false });
     this.dialog().nativeElement.close();
     this.closed.emit();
+  }
+
+  protected requestDelete(): void {
+    if (!this.canDelete() || !this.data()?.wallet.wallet_account_no || this.deleting()) return;
+    this.deleteError.set('');
+    this.confirmingDelete.set(true);
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    const accountNumber = this.data()?.wallet.wallet_account_no;
+    if (!this.canDelete() || !this.confirmingDelete() || !accountNumber || this.deleting()) return;
+    this.deleting.set(true);
+    this.deleteError.set('');
+    try {
+      const response = await deleteWallet(accountNumber);
+      if (this.destroyRef.destroyed) return;
+      if (response?.result !== true) {
+        this.deleteError.set(response?.message || 'Unable to delete account. Please try again.');
+        return;
+      }
+      this.confirmingDelete.set(false);
+      this.deleting.set(false);
+      this.deleted.emit();
+      this.close();
+    } catch {
+      if (!this.destroyRef.destroyed) {
+        this.deleteError.set('Unable to delete account. Please try again.');
+      }
+    } finally {
+      if (!this.destroyRef.destroyed) this.deleting.set(false);
+    }
   }
 
   protected async load(): Promise<void> {

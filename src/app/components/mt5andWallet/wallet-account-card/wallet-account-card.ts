@@ -12,12 +12,12 @@ import type { WalletAccount } from '../../../page/mt5-wallet/wallet-account';
 export class WalletAccountCard {
   readonly account = input.required<WalletAccount>();
   readonly detailsRequested = output<string>();
-  protected readonly hasAccountNumber = computed(() => {
+  protected readonly canOpenDetails = computed(() => {
     const number = this.account().number.trim();
-    return !!number && number !== '—';
+    return this.account().status === 1 && !!number && number !== '—';
   });
 
   protected openDetails(): void {
-    if (this.hasAccountNumber()) this.detailsRequested.emit(this.account().number.trim());
+    if (this.canOpenDetails()) this.detailsRequested.emit(this.account().number.trim());
   }
 }
