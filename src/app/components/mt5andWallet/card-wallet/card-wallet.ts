@@ -15,6 +15,8 @@ import { Button } from '@components/ui/button/button';
 import { deleteWallet } from '@shared/api/wallet/deleteWallet';
 import { getWalletId, type WalletResponseData } from '@shared/api/wallet/getWalletId';
 import { getAuthSession } from '@shared/guard/auth';
+import { ChangeLeverage } from '../change-leverage/change-leverage';
+import { ChangePasswordWallet } from '../change-password-wallet/change-password-wallet';
 import { DepositDemo } from '../deposit-demo/deposit-demo';
 
 const themes = {
@@ -33,9 +35,11 @@ const accountThemes: Partial<Record<number, (typeof themes)[keyof typeof themes]
 };
 
 const passwordFields = [
-  { name: 'master', label: 'Master Password', key: 'wallet_master_password' },
-  { name: 'investor', label: 'Investor Password', key: 'wallet_investor_password' },
+  { name: 'master', label: 'Master Password', key: 'wallet_master_password', type: 'main' },
+  { name: 'investor', label: 'Investor Password', key: 'wallet_investor_password', type: 'investor' },
 ] as const;
+
+type PasswordField = (typeof passwordFields)[number];
 
 function amount(value: number | string | null | undefined): number | null {
   if (value == null || (typeof value === 'string' && !value.trim())) return null;
@@ -44,7 +48,7 @@ function amount(value: number | string | null | undefined): number | null {
 }
 
 @Component({
-  imports: [AlertCard, Button, DecimalPipe, DepositDemo],
+  imports: [AlertCard, Button, ChangeLeverage, ChangePasswordWallet, DecimalPipe, DepositDemo],
   selector: 'app-card-wallet',
   templateUrl: './card-wallet.html',
 })
@@ -73,6 +77,8 @@ export class CardWallet {
   protected readonly deleting = signal(false);
   protected readonly deleteError = signal('');
   protected readonly showDeposit = signal(false);
+  protected readonly showChangeLeverage = signal(false);
+  protected readonly editingPassword = signal<PasswordField | null>(null);
   protected readonly canDeposit = computed(() => {
     const wallet = this.data()?.wallet;
     return wallet?.wallet_trading_type === 'demo' && !!wallet.wallet_account_no;
@@ -128,13 +134,15 @@ export class CardWallet {
     this.request?.abort();
   }
 
-  protected togglePassword(name: (typeof passwordFields)[number]['name']): void {
+  protected togglePassword(name: PasswordField['name']): void {
     this.revealed.update((revealed) => ({ ...revealed, [name]: !revealed[name] }));
   }
 
   protected close(event?: Event): void {
     event?.preventDefault();
-    if (this.deleting() || this.showDeposit()) return;
+    if (this.deleting() || this.showDeposit() || this.showChangeLeverage() || this.editingPassword()) {
+      return;
+    }
     this.request?.abort();
     this.data.set(null);
     this.revealed.set({ master: false, investor: false });
@@ -159,6 +167,25 @@ export class CardWallet {
       void this.load();
       this.balanceRefreshRequested.emit();
     }
+  }
+
+  protected closeChangeLeverage(leverage: number | null): void {
+    this.showChangeLeverage.set(false);
+    if (leverage === null) return;
+
+    this.data.update((data) =>
+      data ? { ...data, wallet: { ...data.wallet, wallet_leverage: leverage } } : data,
+    );
+  }
+
+  protected closeChangePassword(field: PasswordField, password: string | null): void {
+    this.editingPassword.set(null);
+    if (password === null) return;
+
+    this.revealed.update((revealed) => ({ ...revealed, [field.name]: false }));
+    this.data.update((data) =>
+      data ? { ...data, wallet: { ...data.wallet, [field.key]: password } } : data,
+    );
   }
 
   protected async confirmDelete(): Promise<void> {

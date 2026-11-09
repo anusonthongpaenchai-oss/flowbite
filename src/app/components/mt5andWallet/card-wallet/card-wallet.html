@@ -96,9 +96,10 @@
               </button>
               <button
                 type="button"
-                class="grid size-7 place-items-center disabled:cursor-not-allowed"
+                class="grid size-7 cursor-pointer place-items-center rounded-md hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-[#1C64F2] disabled:cursor-not-allowed disabled:opacity-50"
                 [attr.aria-label]="'Edit ' + field.name + ' password'"
-                disabled
+                [disabled]="!wallet.wallet_account_no"
+                (click)="editingPassword.set(field)"
               >
                 <img src="svg/icon/edit.svg" alt="" class="size-5" />
               </button>
@@ -138,9 +139,10 @@
           <dd class="self-center">
             <button
               type="button"
-              class="grid size-7 place-items-center disabled:cursor-not-allowed"
+              class="grid size-7 cursor-pointer place-items-center rounded-md hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-[#1C64F2] disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Edit leverage"
-              disabled
+              [disabled]="!wallet.wallet_account_no"
+              (click)="showChangeLeverage.set(true)"
             >
               <img src="svg/icon/edit.svg" alt="" class="size-5" />
             </button>
@@ -162,6 +164,16 @@
     </div>
     @if (showDeposit() && canDeposit()) {
       <app-deposit-demo [account]="wallet" (closed)="closeDeposit($event)" />
+    }
+    @if (showChangeLeverage()) {
+      <app-change-leverage [account]="wallet" (closed)="closeChangeLeverage($event)" />
+    }
+    @if (editingPassword(); as field) {
+      <app-change-password-wallet
+        [account]="wallet"
+        [type]="field.type"
+        (closed)="closeChangePassword(field, $event)"
+      />
     }
   } @else if (loadFailed()) {
     <div class="grid justify-items-center gap-3 rounded-xl bg-gray-50 p-5 text-sm">

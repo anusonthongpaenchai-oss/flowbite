@@ -2,18 +2,15 @@ import { isAxiosError } from 'axios';
 import { authGuard } from '../../guard/auth';
 import { api } from '../api';
 
-type SendOtpData = {
+export type SendOtpData = {
   memberRef: string;
-  expiresAt: Date;
+  expiresAt?: Date | string | number | null;
+  expiresIn?: number | null;
 };
 
-type SendOtpError = {
-  result: boolean;
-  message: string;
-  error: {
-    code: string;
-    message: string;
-  };
+type SendOtpStatus = {
+  result?: boolean;
+  message?: string;
 };
 
 export type ResponseSendEmail = {
@@ -26,37 +23,30 @@ export type ResponseSendSms = {
   data: SendOtpData;
 };
 
-function requestError(error: unknown, fallback: string): Error {
-  if (isAxiosError<SendOtpError>(error)) {
-    const response = error.response?.data;
-    return new Error(response?.error?.message || response?.message || fallback);
-  }
-
-  return new Error(fallback);
-}
-
-export async function sendSms(): Promise<ResponseSendSms> {
+async function requestOtp<T>(method: 'sms' | 'email', fallback: string): Promise<T> {
   if (!authGuard()) {
     throw new Error('Please sign in to update your profile.');
   }
-  try {
-    const response = await api.post<ResponseSendSms>('/v1/verify/sms/send');
-    return response.data;
-  } catch (error) {
-    throw requestError(error, 'Failed to send SMS. Please try again.');
+
+  const { data } = await api
+    .post<T & SendOtpStatus>(`/v1/verify/${method}/send`)
+    .catch((error: unknown) => {
+      const response = isAxiosError<SendOtpStatus>(error) ? error.response?.data : undefined;
+      throw new Error(response?.message || fallback);
+    });
+
+  if (data?.result === false) {
+    throw new Error(data.message || fallback);
   }
+  return data;
 }
 
-export async function sendEmail(): Promise<ResponseSendEmail> {
-  if (!authGuard()) {
-    throw new Error('Please sign in to update your profile.');
-  }
-  try {
-    const response = await api.post<ResponseSendEmail>('/v1/verify/email/send');
-    return response.data;
-  } catch (error) {
-    throw requestError(error, 'Failed to send Email. Please try again.');
-  }
+export function sendSms(): Promise<ResponseSendSms> {
+  return requestOtp('sms', 'Failed to send SMS. Please try again.');
+}
+
+export function sendEmail(): Promise<ResponseSendEmail> {
+  return requestOtp('email', 'Failed to send Email. Please try again.');
 }
 
 export async function sendTotp() {}
