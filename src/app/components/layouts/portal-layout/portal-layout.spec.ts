@@ -267,6 +267,7 @@ describe('PortalLayout and protected routes', () => {
       wallet_type: 'trading',
       wallet_trading_type: entry.type,
       wallet_balance: 0,
+      wallet_status: 1,
     };
     getMock
       .mockResolvedValueOnce({ data: { result: true, data: [] } } as ApiResponse)
@@ -407,7 +408,7 @@ describe('PortalLayout and protected routes', () => {
     }
   });
 
-  it('builds tabs from the returned trading types and filters both views', async () => {
+  it('filters wallets by status and type and makes inactive wallets read-only in both views', async () => {
     await open();
     const element = harness.routeNativeElement!;
     const wallet = (id: number, name: string, type: string, tradingType: string, status = 1) => ({
@@ -432,14 +433,22 @@ describe('PortalLayout and protected routes', () => {
         result: true,
         message: '',
         data: [
-          wallet(1, 'Live Alpha', 'main', ' LIVE ', 0),
-          wallet(2, 'Funded Beta', 'main', 'funded'),
+          wallet(1, 'Live Alpha', 'trading', ' LIVE '),
+          wallet(2, 'Funded Beta', 'trading', 'funded'),
           wallet(3, 'Main Gamma', 'main', 'wallet'),
-          wallet(4, 'Closed Delta', 'trading', 'inactive'),
+          wallet(4, 'Closed Delta', 'trading', 'live', 0),
           wallet(5, 'Archived Wallet', 'main', 'inactive', 0),
-          wallet(6, 'Legacy Wallet', 'trading', 'main'),
-          wallet(7, 'Uncategorized', 'main', '', 0),
+          wallet(6, 'Deleted Wallet', 'trading', 'deleted', 2),
+          wallet(7, 'Uncategorized', 'trading', '', 0),
           wallet(8, 'Funded Echo', 'trading', ' FUNDED '),
+          wallet(9, 'Points', 'point', 'point'),
+          wallet(10, 'Lots', 'lot', 'lot', 0),
+          wallet(11, 'Rebase', 'rebase', 'rebase'),
+          wallet(12, 'Deleted Main', 'main', 'wallet', 2),
+          wallet(13, 'Live Bonus', 'bonus', 'live'),
+          wallet(14, 'Demo Bonus', 'bonus', 'demo'),
+          wallet(15, 'Demo Account', 'trading', 'demo'),
+          wallet(16, 'Other Category', 'bonus', 'other'),
         ],
       },
     } as ApiResponse);
@@ -460,9 +469,8 @@ describe('PortalLayout and protected routes', () => {
       'All',
       'Live',
       'Funded',
-      'Wallet',
+      'Demo',
       'Inactive',
-      'Main',
     ]);
     expect(tabButtons[0].getAttribute('aria-pressed')).toBe('true');
     const click = async (label: string) => {
@@ -474,34 +482,39 @@ describe('PortalLayout and protected routes', () => {
     const visibleCards = () =>
       [...walletPage.querySelectorAll('article h3')].map((title) => title.textContent?.trim());
 
-    expect(visibleCards()).toEqual([
-      'Live Alpha',
-      'Funded Beta',
-      'Main Gamma',
-      'Closed Delta',
-      'Archived Wallet',
-      'Legacy Wallet',
-      'Uncategorized',
-      'Funded Echo',
-    ]);
+    expect(visibleCards()).toEqual(['Live Alpha', 'Funded Beta', 'Funded Echo', 'Demo Account']);
     expect(walletPage.textContent).toContain('$0');
     for (const [label, names] of [
       ['Live', ['Live Alpha']],
       ['Funded', ['Funded Beta', 'Funded Echo']],
-      ['Wallet', ['Main Gamma']],
-      ['Main', ['Legacy Wallet']],
-      ['Inactive', ['Closed Delta', 'Archived Wallet']],
+      ['Demo', ['Demo Account']],
+      ['Inactive', ['Closed Delta', 'Uncategorized']],
     ] as const) {
       await click(label);
       expect(visibleCards()).toEqual(names);
     }
+    for (const card of walletPage.querySelectorAll('article')) {
+      expect([...card.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+      card.click();
+    }
+    await harness.fixture.whenStable();
+    expect(walletPage.querySelector('app-card-wallet')).toBeNull();
     await click('Table View');
     const table = walletPage.querySelector('table')!;
     expect(table.tBodies[0].rows).toHaveLength(2);
     expect(table.textContent).toContain('0004');
     expect(table.textContent).not.toContain('Live Alpha');
+    expect(table.querySelector('tbody button')).toBeNull();
+    table.tBodies[0].rows[0].click();
+    await harness.fixture.whenStable();
+    expect(walletPage.querySelector('app-card-wallet')).toBeNull();
     await click('All');
-    expect(table.tBodies[0].rows).toHaveLength(8);
+    expect(table.tBodies[0].rows).toHaveLength(4);
+    expect(table.textContent).not.toContain('Live Bonus');
+    expect(table.textContent).not.toContain('Demo Bonus');
+    expect(table.textContent).not.toContain('Closed Delta');
+    expect(table.textContent).not.toContain('Deleted Wallet');
+    expect(table.querySelectorAll('tbody button')).toHaveLength(4);
     expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
@@ -513,6 +526,7 @@ describe('PortalLayout and protected routes', () => {
       wallet_type: 'trading',
       wallet_trading_type: 'live',
       wallet_account_type: 4,
+      wallet_status: 1,
       member_id: 14966,
       wallet_balance: 98000.07,
       wallet_currency: 'USC',
@@ -535,7 +549,14 @@ describe('PortalLayout and protected routes', () => {
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
     await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
-    page.querySelector<HTMLElement>('article')!.click();
+    const card = page.querySelector('article')!;
+    for (const label of ['Deposit', 'Withdraw']) {
+      const button = [...card.querySelectorAll('button')].find(
+        (item) => item.textContent?.trim() === label,
+      );
+      expect(button?.disabled).toBe(true);
+    }
+    card.click();
     await harness.fixture.whenStable();
 
     expect(getMock).toHaveBeenLastCalledWith('/v1/wallet/user/000738475', expect.anything());
@@ -569,9 +590,371 @@ describe('PortalLayout and protected routes', () => {
     expect(page.querySelector('app-card-wallet')).toBeNull();
   });
 
+  async function openDemoDeposit(from: 'wallet details' | 'Add Balance' = 'wallet details') {
+    const wallet = {
+      id: 7,
+      wallet_account_name: 'MT5-000793315',
+      wallet_account_no: '000793315',
+      wallet_type: 'trading',
+      wallet_trading_type: 'demo',
+      wall_account_type: '2',
+      wallet_balance: 500,
+      wallet_status: 1,
+    };
+    getMock
+      .mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as ApiResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: { wallet } } } as ApiResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+    const card = page.querySelector('article')!;
+    if (from === 'Add Balance') {
+      const addBalance = [...card.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === 'Add Balance',
+      );
+      expect(addBalance?.disabled).toBe(false);
+      addBalance!.click();
+    } else {
+      card.click();
+    }
+    await harness.fixture.whenStable();
+    const details = page.querySelector<HTMLDialogElement>('app-card-wallet > dialog')!;
+    if (from === 'wallet details') {
+      const depositButton = () =>
+        [...details.querySelectorAll('button')].find(
+          (button) => button.textContent?.trim() === 'Deposit',
+        );
+      await vi.waitFor(() => expect(depositButton()?.disabled).toBe(false));
+      depositButton()!.click();
+      await harness.fixture.whenStable();
+    }
+    const deposit = await vi.waitFor(() => {
+      const dialog = page.querySelector<HTMLDialogElement>('app-deposit-demo dialog');
+      expect(dialog?.open).toBe(true);
+      expect(dialog?.querySelector('form')).not.toBeNull();
+      return dialog!;
+    });
+    const button = (label: string) =>
+      [...deposit.querySelectorAll<HTMLButtonElement>('app-button button')].find(
+        (item) => item.textContent?.trim() === label,
+      )!;
+    return { wallet, page, details, deposit, button };
+  }
+
+  it.each(['Cancel', 'Close deposit', 'Escape'])(
+    'returns to the same wallet without depositing when dismissed with %s',
+    async (action) => {
+      const post = vi.spyOn(api, 'post');
+      const { page, details, deposit, button } = await openDemoDeposit();
+      if (action === 'Escape') {
+        deposit.dispatchEvent(new Event('cancel', { cancelable: true }));
+      } else {
+        button(action).click();
+      }
+      await harness.fixture.whenStable();
+      expect(page.querySelector('app-deposit-demo')).toBeNull();
+      expect(page.querySelector('app-card-wallet > dialog')).toBe(details);
+      expect(details.open).toBe(true);
+      expect(post).not.toHaveBeenCalled();
+    },
+  );
+
+  it('opens only the deposit dialog from Add Balance and returns to the grid on cancel', async () => {
+    const post = vi.spyOn(api, 'post');
+    const { page, deposit, button } = await openDemoDeposit('Add Balance');
+    expect(page.querySelector('app-card-wallet')).toBeNull();
+    expect(page.querySelector('dialog[open]')).toBe(deposit);
+
+    button('Cancel').click();
+    await harness.fixture.whenStable();
+    expect(page.querySelector('dialog')).toBeNull();
+    expect(page.querySelector('article h3')?.textContent).toBe('MT5-000793315');
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('opens the existing live account dialog from the demo wallet card', async () => {
+    const wallet = {
+      id: 7,
+      wallet_account_name: 'Demo wallet',
+      wallet_account_no: '000793315',
+      wallet_type: 'trading',
+      wallet_trading_type: 'demo',
+      wallet_balance: 500,
+      wallet_status: 1,
+    };
+    getMock.mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as ApiResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+    const openLive = [...page.querySelectorAll<HTMLButtonElement>('article button')].find(
+      (button) => button.textContent?.trim() === 'Open Live',
+    );
+    expect(openLive?.disabled).toBe(false);
+    openLive!.click();
+    await harness.fixture.whenStable();
+    const dialog = page.querySelector<HTMLDialogElement>('app-create-account dialog');
+    expect(dialog?.open).toBe(true);
+    expect(dialog?.querySelector('h2')?.textContent?.trim()).toBe('Open Live Account');
+    expect(page.querySelector('app-card-wallet')).toBeNull();
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
+  });
+
+  it.each(['wallet details', 'Add Balance'] as const)(
+    'deposits the selected demo investment once from %s and reloads wallet balances',
+    async (from) => {
+      let finish!: (value: ApiResponse) => void;
+      const post = vi.spyOn(api, 'post').mockImplementation(
+        () =>
+          new Promise<ApiResponse>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const { wallet, page, details, deposit, button } = await openDemoDeposit(from);
+      const accountFields = [...deposit.querySelectorAll<HTMLInputElement>('app-input input')];
+      expect(accountFields.map((input) => input.value)).toEqual([
+        'MT5-000793315',
+        '000793315',
+        'PoxPrime DEMO',
+      ]);
+      expect(accountFields.every((input) => input.disabled)).toBe(true);
+      const investment = deposit.querySelector('select')!;
+      expect(investment.disabled).toBe(false);
+      expect([...investment.options].map((option) => option.textContent?.trim())).toEqual([
+        '$100',
+        '$1,000',
+        '$10,000',
+        '$100,000',
+      ]);
+      expect(investment.value).toBe('100');
+      investment.value = '10000';
+      investment.dispatchEvent(new Event('change', { bubbles: true }));
+      await harness.fixture.whenStable();
+      expect(post).not.toHaveBeenCalled();
+
+      const updated = { ...wallet, wallet_balance: 10_500 };
+      getMock.mockImplementation(
+        async (url) =>
+          ({
+            data: { result: true, data: url === '/v1/trading' ? [updated] : { wallet: updated } },
+          }) as ApiResponse,
+      );
+      const confirm = button('Confirm');
+      confirm.click();
+      confirm.click();
+      harness.fixture.detectChanges();
+      expect(post).toHaveBeenCalledExactlyOnceWith('/v1/wallet/trade/balance/000793315/deposit', {
+        balance: 10_000,
+        comment: 'Deposit',
+      });
+      expect(confirm.disabled).toBe(true);
+      finish({ data: { result: true, data: { wallet: [updated] } } } as ApiResponse);
+      await vi.waitFor(() => {
+        expect(page.querySelector('app-deposit-demo')).toBeNull();
+        if (from === 'wallet details') {
+          expect(details.open).toBe(true);
+          expect(details.textContent).toContain('10,500.00');
+        } else {
+          expect(page.querySelector('dialog')).toBeNull();
+          expect(page.querySelector('article')?.textContent).toContain('10,500.00');
+        }
+      });
+      expect(getMock.mock.calls.filter(([url]) => url === '/v1/trading')).toHaveLength(2);
+    },
+  );
+
+  it('keeps the deposit form open after a rejected deposit', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue({
+      data: { result: false, message: 'Deposit rejected.' },
+    } as ApiResponse);
+    const { deposit, button } = await openDemoDeposit();
+    button('Confirm').click();
+    await vi.waitFor(() => {
+      expect(deposit.open).toBe(true);
+      expect(deposit.querySelector('[role="alert"]')?.textContent).toContain('Deposit rejected.');
+      expect(button('Confirm').disabled).toBe(false);
+    });
+  });
+
+  it('refreshes the balance before allowing another deposit after a lost response', async () => {
+    const post = vi.spyOn(api, 'post').mockRejectedValue(new Error('Connection lost'));
+    const { wallet, details, deposit, button } = await openDemoDeposit();
+    button('Confirm').click();
+    await harness.fixture.whenStable();
+    expect(deposit.querySelector('[role="alert"]')?.textContent).toContain('Could not confirm');
+    expect(button('Confirm').disabled).toBe(true);
+
+    const updated = { ...wallet, wallet_balance: 600 };
+    getMock
+      .mockResolvedValueOnce({ data: { result: true, data: { wallet: updated } } } as ApiResponse)
+      .mockResolvedValueOnce({ data: { result: true, data: [updated] } } as ApiResponse);
+    button('Cancel').click();
+    await vi.waitFor(() => expect(details.textContent).toContain('600.00'));
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['main', 'point', 'lot', 'rebase', ''])(
+    'does not offer deletion when wallet details have type %s',
+    async (type) => {
+      const wallet = {
+        id: 7,
+        wallet_account_no: '000738475',
+        wallet_type: 'trading',
+        wallet_status: 1,
+      };
+      const remove = vi.spyOn(api, 'delete');
+      getMock
+        .mockResolvedValueOnce({ data: { result: true, data: [wallet] } } as ApiResponse)
+        .mockResolvedValueOnce({
+          data: { result: true, data: { wallet: { ...wallet, wallet_type: type } } },
+        } as ApiResponse);
+      await open('/mt5-wallet');
+      const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+      await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+      page.querySelector<HTMLElement>('article')!.click();
+      await vi.waitFor(() =>
+        expect(page.querySelector('[aria-label="Wallet overview"]')).not.toBeNull(),
+      );
+      expect(page.querySelector('[aria-label="Delete account"]')).toBeNull();
+      expect(page.querySelector('app-alert-card')).toBeNull();
+      expect(remove).not.toHaveBeenCalled();
+    },
+  );
+
+  async function openDeleteWallet() {
+    const wallet = {
+      id: 7,
+      wallet_account_no: '000738475',
+      wallet_account_name: 'Trading account',
+      wallet_type: 'trading',
+      wallet_trading_type: 'live',
+      wallet_balance: 0,
+      wallet_status: 1,
+    };
+    getMock
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { result: true, data: [wallet] },
+      } as ApiResponse)
+      .mockResolvedValueOnce({
+        status: 200,
+        data: { result: true, data: { wallet } },
+      } as ApiResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    await vi.waitFor(() => expect(page.querySelector('article')).not.toBeNull());
+    page.querySelector<HTMLElement>('article')!.click();
+    await harness.fixture.whenStable();
+    const details = page.querySelector<HTMLDialogElement>('app-card-wallet > dialog')!;
+    await vi.waitFor(() =>
+      expect(details.querySelector('[aria-label="Wallet overview"]')).not.toBeNull(),
+    );
+    const trash = details.querySelector<HTMLButtonElement>('[aria-label="Delete account"]');
+    expect(trash).not.toBeNull();
+    trash!.click();
+    await harness.fixture.whenStable();
+    const confirmation = page.querySelector<HTMLDialogElement>('app-alert-card dialog')!;
+    expect(confirmation.open).toBe(true);
+    const button = (label: string) =>
+      [...confirmation.querySelectorAll('button')].find(
+        (item) => item.textContent?.trim() === label,
+      )!;
+    return { page, details, confirmation, button };
+  }
+
+  it.each(['Cancel', 'Close', 'Escape'])(
+    'keeps wallet details open without deleting when confirmation is dismissed with %s',
+    async (action) => {
+      const remove = vi.spyOn(api, 'delete');
+      const { page, details, confirmation, button } = await openDeleteWallet();
+      expect(remove).not.toHaveBeenCalled();
+      if (action === 'Escape') {
+        confirmation.dispatchEvent(new Event('cancel', { cancelable: true }));
+      } else if (action === 'Close') {
+        confirmation.querySelector<HTMLButtonElement>('[aria-label="Cancel deletion"]')!.click();
+      } else {
+        button('Cancel').click();
+      }
+      await harness.fixture.whenStable();
+      expect(page.querySelector('app-alert-card')).toBeNull();
+      expect(details.open).toBe(true);
+      expect(page.querySelector('article')).not.toBeNull();
+      expect(remove).not.toHaveBeenCalled();
+    },
+  );
+
+  it('deletes the selected wallet only after confirmation and refreshes the list', async () => {
+    let finish!: (value: ApiResponse) => void;
+    const remove = vi.spyOn(api, 'delete').mockImplementation(
+      () =>
+        new Promise<ApiResponse>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { page, details, confirmation, button } = await openDeleteWallet();
+    const confirm = button('Yes, delete');
+    confirm.click();
+    confirm.click();
+    // Flush rendering without awaiting the deliberately pending API response.
+    harness.fixture.detectChanges();
+    expect(remove).toHaveBeenCalledExactlyOnceWith('/v1/wallet/user/000738475');
+    expect(confirm.disabled).toBe(true);
+    expect(button('Cancel').disabled).toBe(true);
+    confirmation.dispatchEvent(new Event('cancel', { cancelable: true }));
+    harness.fixture.detectChanges();
+    expect(confirmation.open).toBe(true);
+    expect(details.open).toBe(true);
+    finish({ status: 200, data: { result: true, data: {} } } as ApiResponse);
+    await vi.waitFor(() => {
+      expect(page.querySelector('app-card-wallet')).toBeNull();
+      expect(page.querySelector('article')).toBeNull();
+      expect(page.textContent).toContain('No accounts found.');
+    });
+    expect(getMock.mock.calls.filter(([url]) => url === '/v1/trading')).toHaveLength(2);
+  });
+
+  it.each(['rejected request', 'unsuccessful result'])(
+    'preserves the wallet and allows retry after a %s',
+    async (failure) => {
+      const remove = vi.spyOn(api, 'delete');
+      if (failure === 'rejected request') {
+        remove.mockRejectedValueOnce(new Error('Network failed'));
+      } else {
+        remove.mockResolvedValueOnce({
+          status: 200,
+          data: { result: false, message: 'Account cannot be deleted.' },
+        } as ApiResponse);
+      }
+      remove.mockResolvedValueOnce({ status: 200, data: { result: true } } as ApiResponse);
+      const { page, details, confirmation, button } = await openDeleteWallet();
+      button('Yes, delete').click();
+      await harness.fixture.whenStable();
+      expect(confirmation.querySelector('[role="alert"]')?.textContent?.trim()).toBeTruthy();
+      expect(details.open).toBe(true);
+      expect(page.querySelector('article')).not.toBeNull();
+      expect(button('Yes, delete').disabled).toBe(false);
+      button('Yes, delete').click();
+      await harness.fixture.whenStable();
+      expect(page.querySelector('app-card-wallet')).toBeNull();
+      expect(page.querySelector('article')).toBeNull();
+      expect(remove).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it('opens the existing wallet detail dialog for the selected table row', async () => {
-    const first = { id: 1, wallet_account_no: '0001', wallet_account_name: 'First account' };
-    const selected = { id: 2, wallet_account_no: '0002', wallet_account_name: 'Second account' };
+    const first = {
+      id: 1,
+      wallet_account_no: '0001',
+      wallet_account_name: 'First account',
+      wallet_type: 'trading',
+      wallet_status: 1,
+    };
+    const selected = {
+      id: 2,
+      wallet_account_no: '0002',
+      wallet_account_name: 'Second account',
+      wallet_type: 'trading',
+      wallet_status: 1,
+    };
     getMock
       .mockResolvedValueOnce({
         status: 200,
@@ -621,7 +1004,7 @@ describe('PortalLayout and protected routes', () => {
       [...page.querySelectorAll('[aria-label="Account type"] button')].map((button) =>
         button.textContent?.trim(),
       ),
-    ).toEqual(['All']);
+    ).toEqual(['All', 'Inactive']);
   });
 
   it('shows the wallet total as unavailable when a main wallet has no balance', async () => {
@@ -652,9 +1035,8 @@ describe('PortalLayout and protected routes', () => {
     } as ApiResponse);
     await open('/mt5-wallet');
     const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
-    await vi.waitFor(() =>
-      expect(page.querySelector('article h3')?.textContent).toBe('Main Wallet'),
-    );
+    await vi.waitFor(() => expect(page.textContent).toContain('No accounts found.'));
+    expect(page.querySelector('article')).toBeNull();
     expect(page.textContent?.replace(/\s+/g, ' ')).toContain('— USD');
   });
 

@@ -4,6 +4,7 @@ export interface Member {
   id: number;
   username: string;
   email: string;
+  m_phone?: string | null;
   m_image_url?: string;
   m_image_path?: string;
   m_name?: string;

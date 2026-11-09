@@ -16,6 +16,7 @@ export type WalletDetail = {
   wallet_account_no: string;
   wallet_balance: number;
   wallet_status: number;
+  wall_account_type?: number | string | null;
   wallet_account_type?: number | string | null;
   wallet_currency?: string | null;
   wallet_master_password?: string | null;

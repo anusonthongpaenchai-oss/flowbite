@@ -18,9 +18,10 @@
     <tbody class="divide-y divide-gray-100">
       @for (account of accounts(); track account.id) {
         @let accountNumber = account.number.trim();
-        @let canOpenDetails = accountNumber !== '' && accountNumber !== '—';
+        @let canOpenDetails = account.status === 1 && accountNumber !== '' && accountNumber !== '—';
         <tr
           [class]="canOpenDetails ? 'cursor-pointer hover:bg-gray-50 focus-within:bg-gray-50' : ''"
+          [attr.aria-disabled]="account.status === 0 ? 'true' : null"
           (click)="canOpenDetails && detailsRequested.emit(accountNumber)"
         >
           <th scope="row" class="px-4 py-3 font-medium wrap-break-word">

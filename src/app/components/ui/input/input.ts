@@ -32,10 +32,10 @@ export class InputComponent implements ControlValueAccessor {
   @Input() value: string = '';
   @Input() placeholder: string = '';
   @Input() readOnly = false;
+  @Input() disabled = false;
   @Input() error = '';
   @Output() valueChange = new EventEmitter<string>();
 
-  public disabled = false;
   readonly passwordVisible = signal(false);
 
   togglePassword(): void {

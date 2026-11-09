@@ -1,0 +1,104 @@
+<dialog
+  #dialog
+  aria-labelledby="change-leverage-title"
+  class="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-[436px] overflow-y-auto overscroll-contain rounded-xl border-0 bg-white text-gray-900 backdrop:bg-black/35"
+  [attr.aria-busy]="submitting() || leverages.isLoading()"
+  (cancel)="cancel($event)"
+>
+  <header class="flex min-h-[62px] items-center justify-between border-b border-gray-200 px-5">
+    <h2 id="change-leverage-title" class="text-base font-bold text-[#10106B]">Change Leverage</h2>
+    <app-button
+      variant="ghost"
+      size="compact"
+      icon="svg/icon/x.svg"
+      class="-mr-1 [&_img]:opacity-40"
+      [disabled]="submitting()"
+      (onClick)="cancel()"
+    >
+      <span class="sr-only">Close change leverage</span>
+    </app-button>
+  </header>
+
+  @let wallet = account();
+  @let options = leverages.hasValue() ? leverages.value() : [];
+  <form class="p-5" (submit)="confirm($event)">
+    <div
+      class="grid gap-5 [&_input:disabled]:border-gray-200 [&_input:disabled]:bg-gray-100/70 [&_input:disabled]:text-gray-400 [&_label>span:first-child]:text-xs [&_label>span:first-child]:text-gray-600"
+    >
+      <app-input label="Account Name" [value]="wallet.wallet_account_name" [disabled]="true" />
+      <app-input label="Account Number" [value]="wallet.wallet_account_no" [disabled]="true" />
+      <app-input label="Account Type" [value]="accountType()?.label ?? '—'" [disabled]="true" />
+      <app-input
+        label="Current Leverage"
+        [value]="wallet.wallet_leverage?.toString() ?? '—'"
+        [disabled]="true"
+      />
+    </div>
+
+    <label class="mt-5 grid gap-2 text-xs font-medium text-gray-600">
+      New Leverage
+      <span class="relative block">
+        <select
+          #newLeverage
+          class="h-10 w-full appearance-none rounded-md border border-gray-300 bg-white pr-9 pl-3 text-xs focus-visible:outline-2 focus-visible:outline-[#1C64F2] disabled:cursor-not-allowed"
+          [class.text-gray-500]="!selectedLeverage()"
+          [class.text-gray-900]="!!selectedLeverage()"
+          [disabled]="submitting() || !options.length"
+          (change)="selectedLeverage.set(newLeverage.value)"
+        >
+          <option value="" disabled selected>
+            @if (leverages.isLoading()) {
+              Loading leverage…
+            } @else if (!options.length) {
+              No leverage available
+            } @else {
+              Select New Leverage
+            }
+          </option>
+          @for (option of options; track option) {
+            <option [value]="option">1:{{ option }}</option>
+          }
+        </select>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 12 12"
+          class="pointer-events-none absolute top-1/2 right-4 size-3 -translate-y-1/2 text-gray-400"
+        >
+          <path d="m2.5 4.5 3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" />
+        </svg>
+      </span>
+    </label>
+
+    @if (!accountType()) {
+      <p role="alert" class="mt-3 text-sm text-red-700">This account type is unavailable.</p>
+    } @else if (leverages.error()) {
+      <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <p role="alert" class="text-red-700">Unable to load leverage options.</p>
+        <app-button variant="ghost" size="compact" (onClick)="leverages.reload()">Retry</app-button>
+      </div>
+    }
+    @if (error()) {
+      <p role="alert" class="mt-3 text-sm text-red-700">{{ error() }}</p>
+    }
+
+    <div class="mt-5 flex justify-end gap-2">
+      <app-button
+        variant="secondary"
+        size="compact"
+        class="min-w-[78px]"
+        [disabled]="submitting()"
+        (onClick)="cancel()"
+      >
+        Cancel
+      </app-button>
+      <app-button
+        type="submit"
+        size="compact"
+        class="min-w-[84px] [&_button:disabled]:bg-gray-300"
+        [disabled]="submitting() || !selectedLeverage() || !options.length"
+      >
+        {{ submitting() ? 'Saving…' : 'Confirm' }}
+      </app-button>
+    </div>
+  </form>
+</dialog>

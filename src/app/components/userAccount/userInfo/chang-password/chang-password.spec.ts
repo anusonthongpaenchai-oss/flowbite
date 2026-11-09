@@ -27,10 +27,10 @@ describe('ChangPassword', () => {
     });
   }
 
-  function backendError(message: string): ApiError {
+  function backendError(message: string, responseMessage = 'Request failed.'): ApiError {
     return new ApiError(
       'Request failed',
-      response({ result: false, message: 'Request failed.', error: { code: 'OTP', message } }, 422),
+      response({ result: false, message: responseMessage, error: { code: 'OTP', message } }, 422),
     );
   }
 
@@ -332,7 +332,7 @@ describe('ChangPassword', () => {
       fillPasswords(method);
       postMock.mockRejectedValueOnce(
         failure === 'backend'
-          ? backendError('Unable to deliver OTP.')
+          ? backendError('Internal error.', 'Unable to deliver OTP.')
           : new ApiError('Network Error'),
       );
 
