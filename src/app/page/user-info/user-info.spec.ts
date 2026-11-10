@@ -186,6 +186,22 @@ describe('UserInfo', () => {
     expect(element.querySelector('[aria-labelledby="contact-title"]')?.textContent).toContain(
       'member@example.com',
     );
+    const addressSection = element.querySelector('[aria-labelledby="address-title"]');
+    expect(
+      Array.from(addressSection?.querySelectorAll('.info-row') ?? [], (row) => [
+        row.querySelector('dt')?.textContent?.trim(),
+        row.querySelector('dd')?.textContent?.trim(),
+      ]),
+    ).toEqual([
+      ['Address', '123 Main Road'],
+      ['Sub-district', 'Khlong Tan Nuea'],
+      ['District/City', 'Watthana'],
+      ['Province/State', 'Bangkok'],
+      ['ZIP/Postal code', '10110'],
+    ]);
+    expect(addressSection?.nextElementSibling?.getAttribute('aria-labelledby')).toBe(
+      'social-title',
+    );
     expect(element.querySelector('[role="status"]')).toBeNull();
     expect(element.querySelector('[role="alert"]')).toBeNull();
   });
@@ -218,7 +234,7 @@ describe('UserInfo', () => {
       }),
     );
 
-    render();
+    const element = render();
     await fixture.whenStable();
 
     expect(component.firstName()).toBe('Test');
@@ -228,6 +244,11 @@ describe('UserInfo', () => {
     expect(component.province()).toBe('');
     expect(component.zipCode()).toBe('');
     expect(component.errorMessage()).toBe('');
+    expect(
+      Array.from(element.querySelectorAll('[aria-labelledby="address-title"] dd'), (value) =>
+        value.textContent?.trim(),
+      ),
+    ).toEqual(['—', '—', '—', '—', '—']);
   });
 
   it('shows the backend error without filling the signals when the request is rejected', async () => {
@@ -290,7 +311,7 @@ describe('UserInfo', () => {
     );
     setAuthSession({ ...getAuthSession()!, twoFaEnabled: undefined, rememberDevice: false });
     const element = render();
-    component.openLogoutConfirmation();
+    component.logoutFlow.open();
     fixture.detectChanges();
     const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
     expect(dialog.querySelector('input[type="checkbox"]')).toBeNull();
@@ -350,7 +371,7 @@ describe('UserInfo', () => {
       const router = TestBed.inject(Router);
       const navigate = vi.spyOn(router, 'navigateByUrl');
       const button = harness.routeNativeElement!.querySelector<HTMLButtonElement>(
-        'button[aria-label="Logout"]',
+        'app-user-info button[aria-label="Logout"]',
       )!;
 
       expect(button.querySelector('img')?.getAttribute('src')).toBe('svg/icon/logout-2.svg');
@@ -420,7 +441,7 @@ describe('UserInfo', () => {
       expect(getAuthSession()).toBeNull();
       expect(localStorage.getItem('authSession')).toBeNull();
       expect(sessionStorage.getItem('authSession')).toBeNull();
-      expect(component.isLogoutConfirmationOpen()).toBe(false);
+      expect(component.logoutFlow.isOpen()).toBe(false);
       expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
     },
   );
@@ -460,8 +481,8 @@ describe('UserInfo', () => {
     render();
     await fixture.whenStable();
 
-    await component.handleLogout(false);
-    await component.handleLogout(true);
+    await component.logoutFlow.confirm(false);
+    await component.logoutFlow.confirm(true);
 
     expect(postMock).not.toHaveBeenCalled();
     expect(getAuthSession()).not.toBeNull();
@@ -480,13 +501,13 @@ describe('UserInfo', () => {
       const element = render();
       await fixture.whenStable();
 
-      component.openLogoutConfirmation();
+      component.logoutFlow.open();
       fixture.detectChanges();
-      const request = component.handleLogout(removeRememberedDevices);
+      const request = component.logoutFlow.confirm(removeRememberedDevices);
       fixture.detectChanges();
       const button = element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!;
 
-      expect(component.isLoggingOut()).toBe(true);
+      expect(component.logoutFlow.isLoggingOut()).toBe(true);
       expect(button.disabled).toBe(true);
       expect(button.textContent).toContain('Logging out...');
       const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
@@ -496,11 +517,11 @@ describe('UserInfo', () => {
         ).every((control) => control.disabled),
       ).toBe(true);
       dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
-      component.closeLogoutConfirmation();
+      component.logoutFlow.close();
       expect(dialog.open).toBe(true);
-      expect(component.isLogoutConfirmationOpen()).toBe(true);
+      expect(component.logoutFlow.isOpen()).toBe(true);
       button.click();
-      await component.handleLogout(removeRememberedDevices);
+      await component.logoutFlow.confirm(removeRememberedDevices);
       expect(postMock).toHaveBeenCalledTimes(1);
       expect(getAuthSession()).not.toBeNull();
 
@@ -510,7 +531,7 @@ describe('UserInfo', () => {
       } as ApiResponse);
       await request;
 
-      expect(component.isLoggingOut()).toBe(false);
+      expect(component.logoutFlow.isLoggingOut()).toBe(false);
       expect(getAuthSession()).toBeNull();
     },
   );
@@ -553,7 +574,7 @@ describe('UserInfo', () => {
       await fixture.whenStable();
       const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
 
-      component.openLogoutConfirmation();
+      component.logoutFlow.open();
       fixture.detectChanges();
       const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
       if (removeRememberedDevices) {
@@ -578,15 +599,15 @@ describe('UserInfo', () => {
       expect(
         element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!.disabled,
       ).toBe(false);
-      expect(component.isLoggingOut()).toBe(false);
+      expect(component.logoutFlow.isLoggingOut()).toBe(false);
       expect(getAuthSession()).not.toBeNull();
       expect(navigate).not.toHaveBeenCalled();
 
       findButton(dialog, 'Logout').click();
       await fixture.whenStable();
 
-      expect(component.logoutErrorMessage()).toBe('');
-      expect(component.isLogoutConfirmationOpen()).toBe(false);
+      expect(component.logoutFlow.errorMessage()).toBe('');
+      expect(component.logoutFlow.isOpen()).toBe(false);
       expect(getAuthSession()).toBeNull();
       expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
     },
@@ -617,6 +638,30 @@ describe('UserInfo', () => {
         component.isEditProfile(),
       ].filter(Boolean),
     ).toHaveLength(1);
+  });
+
+  it.each([
+    [{ isKyc: 0, isKYC: 1 }, false],
+    [{ isKyc: 1, isKYC: 0 }, true],
+    [{ isKYC: 1 }, true],
+    [{ isKYC: undefined }, true],
+  ] as const)('sets Edit Profile availability for KYC flags %j', async (flags, disabled) => {
+    getMock.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        ...profile,
+        data: { ...profile.data, member: { ...profile.data.member, ...flags } },
+      },
+    } as ApiResponse);
+
+    const element = render();
+    await fixture.whenStable();
+    const editButton = findButton(element, 'Edit Profile');
+
+    expect(editButton.disabled).toBe(disabled);
+    editButton.click();
+    await fixture.whenStable();
+    expect(element.querySelector('app-edit-profile') === null).toBe(disabled);
   });
 
   it('cancels the password form and starts a new flow when reopened', async () => {

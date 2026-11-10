@@ -1,5 +1,5 @@
-import { Component, computed, inject, OnInit, PendingTasks, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, computed, effect, inject, OnInit, PendingTasks, signal } from '@angular/core';
+import { Router, type Navigation } from '@angular/router';
 import type { Member } from '../../../shared/api/auth/login';
 import {
   normalizeProfileUpdateRequest,
@@ -13,10 +13,9 @@ import { EditProfile } from '../../components/userAccount/userInfo/edit-profile/
 import { ChangImage } from '../../components/userAccount/userInfo/chang-image/chang-image';
 import { ChangPassword } from '../../components/userAccount/userInfo/chang-password/chang-password';
 import { LogoutConfirmation } from '../../components/userAccount/userInfo/logout-confirmation/logout-confirmation';
+import { LogoutFlow } from '../../components/userAccount/userInfo/logout-confirmation/logout-flow';
 
 // api
-import { logout } from '../../../shared/api/auth/logout';
-import { logoutSessions } from '../../../shared/api/auth/logoutSessions';
 import { getUserInfo } from '../../../shared/api/userInfo/userInfo';
 import {
   clearAuthSession,
@@ -24,8 +23,12 @@ import {
   getRememberedAuthSession,
   setAuthSession,
 } from '../../../shared/guard/auth';
+
+const handledPasswordNavigations = new WeakSet<Navigation>();
+
 @Component({
   imports: [Button, EditProfile, ChangImage, ChangPassword, LogoutConfirmation],
+  providers: [LogoutFlow],
   selector: 'app-user-info',
   host: { class: 'block' },
   templateUrl: './user-info.html',
@@ -40,10 +43,7 @@ export class UserInfo implements OnInit {
 
   readonly isLoading = signal(false);
   readonly errorMessage = signal('');
-  readonly isLoggingOut = signal(false);
-  readonly logoutErrorMessage = signal('');
-  readonly isLogoutConfirmationOpen = signal(false);
-  readonly canRemoveRememberedDevices = signal(false);
+  readonly logoutFlow = inject(LogoutFlow);
 
   public isChangeImageProfile = signal<boolean>(false);
   public isChangePassword = signal<boolean>(false);
@@ -55,6 +55,7 @@ export class UserInfo implements OnInit {
   // user info
   public memberId = signal<number>(0);
   public imgUrl = signal<string>('');
+  private readonly isKyc = signal<0 | 1 | undefined>(undefined);
 
   // general info
   public firstName = signal('');
@@ -63,6 +64,9 @@ export class UserInfo implements OnInit {
   public country = signal('');
 
   // edit profile
+  readonly canEditProfile = computed(
+    () => !this.isLoading() && !this.isUpdating() && !!this.memberId() && this.isKyc() === 0,
+  );
   readonly fullName = computed(
     () => [this.firstName(), this.lastName()].filter(Boolean).join(' ') || '—',
   );
@@ -75,31 +79,6 @@ export class UserInfo implements OnInit {
   public phone = signal('');
   public phoneCode = signal('');
 
-  readonly formattedPhone = computed(() => {
-    const countryCode = this.phoneCode().replace(/\D/g, '');
-    const phone = this.phone().trim();
-    const international = phone.startsWith('+');
-    let number = phone.replace(/\D/g, '');
-
-    if (!number) {
-      return '';
-    }
-
-    if (international && (!countryCode || !number.startsWith(countryCode))) {
-      return `+${number}`;
-    }
-
-    if (countryCode && number.startsWith(countryCode) && (international || number.length > 10)) {
-      number = number.slice(countryCode.length);
-    }
-
-    if (countryCode === '66') {
-      number = number.replace(/^0(?=\d{9}$)/, '');
-    }
-
-    const formattedNumber = number.replace(/^(\d{2})(\d{3})(\d{4})$/, '$1-$2-$3');
-    return `${countryCode ? `+${countryCode}` : ''}${formattedNumber}`;
-  });
 
   // social info (mock)
   public googleLink = signal<boolean>(false);
@@ -138,6 +117,19 @@ export class UserInfo implements OnInit {
     },
   }));
 
+  constructor() {
+    effect(() => {
+      const navigation = this.router.lastSuccessfulNavigation();
+      if (
+        navigation?.extras.info === 'change-password' &&
+        !handledPasswordNavigations.has(navigation)
+      ) {
+        handledPasswordNavigations.add(navigation);
+        this.isChangePassword.set(true);
+      }
+    });
+  }
+
   public openChangeImageProfile(): void {
     if (this.isLoading() || this.isUpdating() || !this.memberId()) {
       return;
@@ -159,7 +151,7 @@ export class UserInfo implements OnInit {
   }
 
   public openEditProfile(): void {
-    if (this.isLoading() || this.isUpdating() || !this.memberId()) {
+    if (!this.canEditProfile()) {
       return;
     }
     this.updateErrorMessage.set('');
@@ -221,55 +213,9 @@ export class UserInfo implements OnInit {
     this.pendingTasks.run(() => this.loadUserInfo());
   }
 
-  public openLogoutConfirmation(): void {
-    if (this.isLoggingOut()) {
-      return;
-    }
-
-    this.logoutErrorMessage.set('');
-    // Completed 2FA sessions also have require2FA: false; use the saved 2FA status.
-    const session = getAuthSession();
-    this.canRemoveRememberedDevices.set(
-      session?.twoFaEnabled === true && session.rememberDevice === true,
-    );
-    this.isLogoutConfirmationOpen.set(true);
-  }
-
-  public closeLogoutConfirmation(): void {
-    if (!this.isLoggingOut()) {
-      this.isLogoutConfirmationOpen.set(false);
-    }
-  }
-
-  public async handleLogout(removeRememberedDevices: boolean): Promise<void> {
-    if (this.isLoggingOut() || !this.isLogoutConfirmationOpen()) {
-      return;
-    }
-
-    this.isLoggingOut.set(true);
-    this.logoutErrorMessage.set('');
-    const completeTask = this.pendingTasks.add();
-
-    try {
-      if (this.canRemoveRememberedDevices() && removeRememberedDevices) {
-        await logoutSessions();
-      } else {
-        await logout();
-      }
-      this.isLogoutConfirmationOpen.set(false);
-      await this.router.navigateByUrl('/', { replaceUrl: true });
-    } catch (error) {
-      this.logoutErrorMessage.set(
-        error instanceof Error ? error.message : 'Unable to sign out. Please try again.',
-      );
-    } finally {
-      this.isLoggingOut.set(false);
-      completeTask();
-    }
-  }
-
   private async loadUserInfo(): Promise<void> {
     this.isLoading.set(true);
+    this.isKyc.set(undefined);
     this.errorMessage.set('');
 
     try {
@@ -279,10 +225,12 @@ export class UserInfo implements OnInit {
         throw new Error(response?.message || 'Unable to load your profile. Please try again.');
       }
 
-      const { member, address, isTrusted } = response.data;
+      const { member, address, isTrusted, isKyc, isKYC } = response.data;
       this.synchronizeSessionMember(
         {
           id: member.id,
+          ...(member.username === undefined ? {} : { username: member.username }),
+          ...(member.m_username === undefined ? {} : { m_username: member.m_username }),
           m_name: member.m_name,
           m_lastname: member.m_lastname,
           m_image_url: member.m_image_url,
@@ -293,6 +241,7 @@ export class UserInfo implements OnInit {
 
       this.memberId.set(member.id ?? 0);
       this.imgUrl.set(member.m_image_url ?? '');
+      this.isKyc.set(member.isKyc ?? member.isKYC ?? isKyc ?? isKYC);
 
       this.firstName.set(member.m_name ?? '');
       this.lastName.set(member.m_lastname ?? '');
@@ -328,7 +277,6 @@ export class UserInfo implements OnInit {
     if (typeof isTrusted === 'boolean') {
       nextSession.twoFaEnabled = isTrusted || session.twoFaEnabled === true;
       nextSession.rememberDevice = isTrusted;
-      this.canRemoveRememberedDevices.set(isTrusted);
     }
     if (JSON.stringify(nextSession) !== JSON.stringify(session)) {
       setAuthSession(nextSession, getRememberedAuthSession() !== null);

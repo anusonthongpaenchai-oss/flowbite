@@ -1,8 +1,15 @@
-<section class="py-3 text-[#111928]" aria-labelledby="verify-page-title">
-  <h2 id="verify-page-title" class="mb-5 text-xl font-semibold">User Verify</h2>
+<section class="@container py-3 text-[#111928]" aria-labelledby="verify-page-title">
+  @if (titleShow() === true) {
+    <h2 id="verify-page-title" class="mb-5 text-xl font-semibold">User Verify</h2>
+  }
   @if (kycDetail() && !isLoading() && !hasInitialLoadError()) {
     <div
-      class="grid grid-cols-1 items-stretch gap-4 min-[600px]:grid-cols-2 min-[1000px]:grid-cols-4"
+      class="grid grid-cols-1 items-stretch gap-4"
+      [class]="
+        embedded()
+          ? '@min-[480px]:grid-cols-2 @min-[700px]:grid-cols-3'
+          : 'min-[600px]:grid-cols-2 min-[1000px]:grid-cols-4'
+      "
     >
       <div
         class="min-w-0 [&_app-verify-status>div]:h-full [&_app-verify-status>div]:max-w-none [&_app-verify-status]:h-full"
@@ -18,6 +25,13 @@
         [require2fa]="require2fa()"
         (require2faChange)="onTwoFaEnabled($event)"
       ></app-google-auth>
+      <app-phone-verify
+        [isKyc]="isKyc()"
+        [pending]="statusVariant() === 'pending'"
+        [disabled]="isBusy() || !canVerify()"
+        (verifyRequested)="openVerification()"
+      ></app-phone-verify>
+      <app-email-verify></app-email-verify>
     </div>
   }
   @if (hasInitialLoadError()) {

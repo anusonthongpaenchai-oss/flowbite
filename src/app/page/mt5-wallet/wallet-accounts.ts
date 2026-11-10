@@ -12,15 +12,11 @@ export class WalletAccounts {
 
   readonly accounts = this.records.asReadonly();
   readonly loadState = this.state.asReadonly();
+  readonly mainBalance = computed(() => this.activeTotal('main', 'balance'));
+  readonly pointsCredit = computed(() => this.activeTotal('point', 'credit'));
   readonly balanceLabel = computed(() => {
-    if (this.loadState() !== 'ready') return '— USD';
-
-    let total = 0;
-    for (const account of this.accounts()) {
-      if (!account.isActiveMainWallet) continue;
-      if (account.balance === null) return '— USD';
-      total += account.balance;
-    }
+    const total = this.mainBalance();
+    if (total === null) return '— USD';
     return `${formatNumber(total, this.locale, total % 1 === 0 ? '1.0-0' : '1.2-2')} USD`;
   });
 
@@ -46,5 +42,18 @@ export class WalletAccounts {
     } catch {
       if (requestId === this.requestId) this.state.set('error');
     }
+  }
+
+  private activeTotal(type: 'main' | 'point', field: 'balance' | 'credit'): number | null {
+    if (this.loadState() !== 'ready') return null;
+
+    let total = 0;
+    for (const account of this.accounts()) {
+      if (account.type !== type || account.status !== 1) continue;
+      const amount = account[field];
+      if (amount === null) return null;
+      total += amount;
+    }
+    return total;
   }
 }

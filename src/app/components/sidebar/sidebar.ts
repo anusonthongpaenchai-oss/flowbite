@@ -1,4 +1,4 @@
-import { CurrencyPipe, NgTemplateOutlet } from '@angular/common';
+import { CurrencyPipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { Member } from '../../../shared/api/auth/login';
@@ -15,18 +15,21 @@ type SidebarItem = {
 
 @Component({
   selector: 'app-sidebar',
-  imports: [CurrencyPipe, NgTemplateOutlet, RouterLink],
+  imports: [CurrencyPipe, DecimalPipe, NgTemplateOutlet, RouterLink],
   host: { class: 'block h-full min-h-0' },
   templateUrl: './sidebar.html',
 })
 export class Sidebar {
   readonly member = input<Member | null>(null);
-  readonly availableBalance = 3000;
+  readonly availableBalance = input<number | null>(null);
+  readonly pointsCredit = input<number | null>(null);
   readonly collapsed = input(false);
   readonly mobile = input(false);
   readonly activePage = input<PortalPage>('dashboard');
+  readonly isLoggingOut = input(false);
   readonly toggleRequested = output<void>();
   readonly navigated = output<void>();
+  readonly logoutRequested = output<void>();
   readonly failedImage = signal('');
 
   readonly fullName = computed(() => {
@@ -64,7 +67,7 @@ export class Sidebar {
           label: 'MT5 & Wallet',
           url: '/mt5-wallet',
           page: 'wallet',
-          icon: 'svg/sidebar/wallet.svg',
+          icon: 'svg/icon/wallet.svg',
         },
       ],
     },

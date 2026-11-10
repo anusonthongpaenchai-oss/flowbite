@@ -21,7 +21,12 @@
           @for (option of views; track option.key) {
             <button
               type="button"
-              class="group flex min-h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 font-medium hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1C64F2] aria-pressed:bg-linear-to-r aria-pressed:from-[#0A136A] aria-pressed:from-10% aria-pressed:to-[#00D4FC] aria-pressed:text-white"
+              class="group flex min-h-[34px] cursor-pointer items-center gap-2 rounded-md px-3 font-medium hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1C64F2] aria-pressed:text-white"
+              [class]="
+                option.key === 'table'
+                  ? 'aria-pressed:bg-blue-700'
+                  : 'aria-pressed:bg-linear-to-r aria-pressed:from-[#0A136A] aria-pressed:from-10% aria-pressed:to-[#00D4FC]'
+              "
               [attr.aria-pressed]="view() === option.key"
               (click)="view.set(option.key)"
             >
@@ -61,22 +66,24 @@
     </div>
   </div>
 
-  <div
-    class="mt-3 flex flex-wrap gap-x-4 border-b border-gray-200 sm:gap-x-6"
-    role="group"
-    aria-label="Account type"
-  >
-    @for (tab of tabs(); track tab) {
-      <button
-        type="button"
-        class="-mb-px min-h-10 cursor-pointer border-b-2 border-transparent px-1 py-2 text-sm text-gray-600 hover:text-[#1C64F2] focus-visible:outline-2 focus-visible:outline-[#1C64F2] aria-pressed:border-[#1C64F2] aria-pressed:font-medium aria-pressed:text-[#1C64F2]"
-        [attr.aria-pressed]="activeTab() === tab"
-        (click)="activeTab.set(tab)"
-      >
-        {{ tab === null ? 'All' : (tab | titlecase) }}
-      </button>
-    }
-  </div>
+  @if (view() === 'grid') {
+    <div
+      class="mt-3 flex flex-wrap gap-x-4 border-b border-gray-200 sm:gap-x-6"
+      role="group"
+      aria-label="Account type"
+    >
+      @for (tab of tabs(); track tab) {
+        <button
+          type="button"
+          class="-mb-px min-h-10 cursor-pointer border-b-2 border-transparent px-1 py-2 text-sm text-gray-600 hover:text-[#1C64F2] focus-visible:outline-2 focus-visible:outline-[#1C64F2] aria-pressed:border-[#1C64F2] aria-pressed:font-medium aria-pressed:text-[#1C64F2]"
+          [attr.aria-pressed]="activeTab() === tab"
+          (click)="activeTab.set(tab)"
+        >
+          {{ tab === null ? 'All' : (tab | titlecase) }}
+        </button>
+      }
+    </div>
+  }
 
   @if (accountCreated()) {
     <p role="status" class="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
@@ -94,28 +101,40 @@
         <p role="alert" class="text-sm text-gray-700">Unable to load accounts.</p>
         <app-button variant="secondary" size="compact" (onClick)="loadAccounts()">Retry</app-button>
       </div>
-    } @else if (!visibleAccounts().length) {
-      <p class="rounded-xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-600" role="status">
-        No accounts found.
-      </p>
-    } @else if (view() === 'grid') {
-      <div class="@container">
-        <div class="grid grid-cols-1 gap-4 @min-[520px]:grid-cols-2 @min-[780px]:grid-cols-3">
-          @for (account of visibleAccounts(); track account.id) {
-            <app-wallet-account-card
-              [account]="account"
-              (detailsRequested)="selectedAccountNumber.set($event)"
-              (addBalanceRequested)="depositAccountNumber.set($event)"
-              (openLiveRequested)="openCreateAccount('live')"
-            />
-          }
-        </div>
-      </div>
-    } @else {
+    } @else if (view() === 'table') {
       <app-wallet-account-table
-        [accounts]="visibleAccounts()"
+        [accounts]="tableAccounts()"
         (detailsRequested)="selectedAccountNumber.set($event)"
       />
+    } @else {
+      @let wallet = visibleMainWallet();
+      @let accounts = visibleAccounts();
+      <div class="@container flex flex-col gap-4">
+        @if (wallet) {
+          <div class="grid grid-cols-1 @min-[520px]:grid-cols-2 @min-[780px]:grid-cols-3 gap-4">
+            <app-main-wallet [balance]="wallet.balance" />
+          </div>
+        }
+        @if (accounts.length) {
+          <div class="grid grid-cols-1 gap-4 @min-[520px]:grid-cols-2 @min-[780px]:grid-cols-3">
+            @for (account of accounts; track account.id) {
+              <app-wallet-account-card
+                [account]="account"
+                (detailsRequested)="selectedAccountNumber.set($event)"
+                (addBalanceRequested)="depositAccountNumber.set($event)"
+                (openLiveRequested)="openCreateAccount('live')"
+              />
+            }
+          </div>
+        } @else if (!wallet) {
+          <p
+            class="rounded-xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-600"
+            role="status"
+          >
+            No accounts found.
+          </p>
+        }
+      </div>
     }
   </div>
 </section>

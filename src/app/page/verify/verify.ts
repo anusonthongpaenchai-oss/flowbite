@@ -5,6 +5,7 @@ import {
   DestroyRef,
   ElementRef,
   inject,
+  input,
   OnInit,
   PendingTasks,
   signal,
@@ -40,6 +41,8 @@ import { InputComponent } from '../../components/ui/input/input';
 import { Button } from '../../components/ui/button/button';
 import { Verify as VerifyStatus } from '../../components/userAccount/verify/verify';
 import { GoogleAuth } from '../../components/userAccount/google-auth/google-auth';
+import { PhoneVerify } from '../../components/userAccount/phone-verify/phone-verify';
+import { EmailVerify } from '../../components/userAccount/email-verify/email-verify';
 
 type VerifyStep = 'profile' | 'otp' | 'id-proof';
 type OtpMethod = 'sms' | 'email';
@@ -52,12 +55,23 @@ function profileValidator(field: ProfileField): ValidatorFn {
 }
 
 @Component({
-  imports: [InputComponent, Button, ReactiveFormsModule, VerifyStatus, GoogleAuth],
+  imports: [
+    InputComponent,
+    Button,
+    ReactiveFormsModule,
+    VerifyStatus,
+    GoogleAuth,
+    PhoneVerify,
+    EmailVerify,
+  ],
   selector: 'app-verify',
   styleUrl: './verify.css',
   templateUrl: './verify.html',
 })
 export class Verify implements OnInit {
+  readonly embedded = input(false);
+  readonly titleShow = input(true);
+
   private readonly fb = inject(FormBuilder);
   private readonly pendingTasks = inject(PendingTasks);
   private readonly destroyRef = inject(DestroyRef);
@@ -69,6 +83,7 @@ export class Verify implements OnInit {
 
   public readonly kycDetail = signal<KycResponse | null>(null);
   public readonly require2fa = signal(getAuthSession()?.twoFaEnabled === true);
+  protected readonly isKyc = signal<0 | 1>(0);
   public readonly step = signal<VerifyStep>('profile');
   public readonly hasStarted = signal(false);
   public readonly isVerificationOpen = signal(false);
@@ -261,6 +276,11 @@ export class Verify implements OnInit {
   }
 
   public onDialogCancel(event: Event): void {
+    // The file picker also emits a cancel event that bubbles to the dialog.
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
     event.preventDefault();
     this.closeVerification();
   }
@@ -414,6 +434,9 @@ export class Verify implements OnInit {
         throw new Error(response?.data?.message || 'Failed to load KYC. Please try again.');
       }
       this.kycDetail.set(response.data);
+      const sessionKyc = getAuthSession()?.member.isKYC;
+      const kycFromStatus = response.data.data.kyc_stat === 1 ? 1 : 0;
+      this.isKyc.set(sessionKyc === 0 || sessionKyc === 1 ? sessionKyc : kycFromStatus);
       if (this.canVerify() && response.data.data.kyc_stat !== 2) {
         await this.loadUserInfo();
       }
@@ -436,7 +459,11 @@ export class Verify implements OnInit {
       throw new Error(response?.message || 'Unable to load your profile. Please try again.');
     }
 
-    const { member, address } = response.data;
+    const { member, address, isKyc, isKYC } = response.data;
+    const profileKyc = member.isKyc ?? member.isKYC ?? isKyc ?? isKYC;
+    if (profileKyc === 0 || profileKyc === 1) {
+      this.isKyc.set(profileKyc);
+    }
     this.m_phone_code.set(member.m_phone_code ?? '');
 
     this.profileForm.reset({

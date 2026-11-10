@@ -1,9 +1,10 @@
 <div
-  class="sidebar group/sidebar flex h-full min-h-0 flex-col gap-4 text-sm leading-[1.5] [&_svg]:shrink-0 [&_svg]:stroke-current [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round] [&_svg]:[stroke-width:1.8]"
+  class="sidebar group/sidebar flex h-full min-h-0 flex-col gap-4 bg-gray-100 p-3 text-sm leading-normal"
   [class.is-collapsed]="collapsed()"
 >
+  <!-- top -->
   <section
-    class="summary-card shrink-0 rounded-[18px] border border-[#f0f1f3] bg-white p-4 group-[.is-collapsed]/sidebar:p-3"
+    class="summary-card shrink-0 rounded-[18px] border border-[#f0f1f3] bg-white p-4 group-[.is-collapsed]/sidebar:p-3 bg-[url('/svg/background/sidebar.png')] bg-cover bg-center bg-no-repeat hover:bg-[url('/svg/background/sidebar-hover.png')] hover:bg-cover hover:bg-center hover:bg-no-repeat"
     aria-label="Account summary"
   >
     <div
@@ -27,15 +28,12 @@
         "
         (click)="toggleRequested.emit()"
       >
-        <svg class="size-[22px]" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          @if (mobile()) {
-            <path d="m6 6 12 12M6 18 18 6" />
-          } @else {
-            <rect x="4" y="4" width="16" height="16" rx="2" />
-            <path d="M9 4v16" />
-            <path [attr.d]="collapsed() ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'" />
-          }
-        </svg>
+        <img
+          class="size-[22px]"
+          [class.-scale-x-100]="collapsed() && !mobile()"
+          [src]="mobile() ? 'svg/icon/x.svg' : 'svg/icon/layout-sidebar-left-collapse.svg'"
+          alt=""
+        />
       </button>
     </div>
     <div class="user-summary mt-4 flex items-center gap-3 group-[.is-collapsed]/sidebar:hidden">
@@ -65,31 +63,37 @@
         <span
           class="metric-badge mt-[3px] inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-px text-[12px] whitespace-nowrap text-[#111928]"
         >
-          <img class="size-[13px] shrink-0" src="svg/sidebar/gift.svg" alt="" />
-          3000 GP
+          <img class="size-[13px] shrink-0" src="svg/icon/gift.svg" alt="" />
+          {{ (pointsCredit() | number: '1.0-2') ?? '—' }} GP
         </span>
       </div>
     </div>
     <div
       class="balance-summary mt-4 border-t border-gray-100 pt-3.5 group-[.is-collapsed]/sidebar:hidden"
     >
+      @let amount = availableBalance();
       <div class="balance-row flex items-center justify-between gap-2 text-gray-500">
-        <span>Available Balance</span
-        ><strong class="min-w-0 text-right text-[22px] font-bold wrap-break-word text-[#1c64f2]">{{
-          availableBalance | currency: 'USD' : 'symbol' : '1.0-2'
-        }}</strong>
+        <span>Available Balance</span>
+        <strong class="min-w-0 text-right text-[22px] font-bold wrap-break-word text-[#1c64f2]">
+          {{
+            (amount
+              | currency
+                : 'USD'
+                : 'symbol'
+                : (amount !== null && amount % 1 !== 0 ? '1.2-2' : '1.0-0')) ?? '—'
+          }}
+        </strong>
       </div>
       <span
         class="metric-badge mt-[3px] inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-px text-[12px] whitespace-nowrap text-[#111928]"
       >
-        <svg class="size-[13px]" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M4 20v-6M9 20v-9M14 20v-6M19 20V8M3 10l6-6 5 5 7-7M17 2h4v4" />
-        </svg>
+        <img class="size-[13px] shrink-0" src="svg/icon/chart-mixed.svg" alt="" />
         20 lots/Day
       </span>
     </div>
   </section>
 
+  <!-- nav -->
   <nav
     class="navigation-card min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[18px] border border-[#f0f1f3] bg-white p-3 [scrollbar-width:thin] group-[.is-collapsed]/sidebar:p-2"
     aria-label="Sidebar"
@@ -135,6 +139,27 @@
         }
       </section>
     }
+
+    <hr
+      class="mx-2.5 mt-3 mb-1 border-0 border-t border-gray-200 group-[.is-collapsed]/sidebar:mx-0"
+    />
+    <button
+      type="button"
+      class="navigation-item flex min-h-12 w-full cursor-pointer items-center gap-2.5 rounded-lg border-0 bg-transparent p-2.5 text-left font-medium text-[#111] hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1c64f2] disabled:cursor-wait disabled:opacity-60 group-[.is-collapsed]/sidebar:justify-center group-[.is-collapsed]/sidebar:px-0"
+      aria-label="Logout"
+      [title]="collapsed() ? 'Logout' : ''"
+      [disabled]="isLoggingOut()"
+      (click)="logoutRequested.emit()"
+    >
+      <span
+        class="size-5 shrink-0 bg-current mask-contain mask-center mask-no-repeat"
+        style="mask-image: url('svg/icon/logout-2.svg')"
+        aria-hidden="true"
+      ></span>
+      <span class="group-[.is-collapsed]/sidebar:hidden">
+        {{ isLoggingOut() ? 'Logging out...' : 'Logout' }}
+      </span>
+    </button>
   </nav>
 </div>
 
@@ -146,13 +171,10 @@
   ></span>
   <span class="item-label group-[.is-collapsed]/sidebar:hidden">{{ item.label }}</span>
   @if (item.chevron) {
-    <svg
-      class="chevron ml-auto size-4 text-[#111] group-[.is-collapsed]/sidebar:hidden"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
+    <img
+      class="chevron ml-auto h-2.5 w-1.5 shrink-0 -rotate-90 group-[.is-collapsed]/sidebar:hidden"
+      src="svg/icon/Vector.svg"
+      alt=""
+    />
   }
 </ng-template>

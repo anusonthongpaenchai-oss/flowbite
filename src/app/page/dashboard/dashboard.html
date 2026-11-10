@@ -1,5 +1,251 @@
-<section>
-    <div>
-        
+<h1 class="sr-only">Dashboard</h1>
+<div class="flex flex-col gap-5 mb-10">
+  <!-- isKyc -->
+  @if (showKycAlert()) {
+    <section
+      aria-label="Verification alert"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#FDF6B2] p-4 text-sm text-gray-900"
+    >
+      <p class="flex items-center gap-2 font-medium">
+        <span
+          class="size-5 shrink-0 bg-[#E3A008] [mask:url('/svg/icon/circle-alert-fill.svg')_center/contain_no-repeat]"
+          aria-hidden="true"
+        ></span>
+        Alerts! Please verify your account.
+      </p>
+      <a
+        routerLink="/user/verify"
+        class="rounded text-xs font-semibold text-[#8E4B10] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        Click to Verify
+      </a>
+    </section>
+  }
+
+  <!-- account table -->
+  <section aria-labelledby="my-portal-title">
+    <app-wallet-account-table
+      class="[&_table]:bg-white"
+      [accounts]="tableAccounts()"
+      [showSearch]="false"
+      (detailsRequested)="selectedAccountNumber.set($event)"
+    >
+      <h2 wallet-table-heading class="font-bold">My Portal</h2>
+      <div
+        wallet-table-actions
+        class="h-4.5 w-px bg-gray-200"
+        aria-hidden="true"
+      ></div>
+      <button
+        wallet-table-actions
+        type="button"
+        class="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg bg-[linear-gradient(89.87deg,#0a136a_-17.83%,#00d4fc_141.24%)] px-3 py-2 text-sm/[1.5] font-medium text-white enabled:hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1C64F2] disabled:cursor-wait disabled:opacity-[0.65]"
+        [disabled]="checkingKyc()"
+        (click)="openLiveAccount()"
+      >
+        <img src="svg/icon/plus.svg" alt="" class="size-3 invert" />
+        <span>Open Live Account</span>
+      </button>
+    </app-wallet-account-table>
+    @if (kycStatus() === 'verified' && walletLoadState() === 'error') {
+      <div class="mt-2 flex flex-wrap items-center gap-3">
+        <p role="alert" class="text-sm text-red-700">Unable to load wallet accounts.</p>
+        <app-button variant="secondary" size="compact" (onClick)="loadWallets()">Retry</app-button>
+      </div>
+    }
+  </section>
+
+  <!-- refferal -->
+  <h2 class="text-base font-bold">Your Referral Link</h2>
+  <section
+    aria-labelledby="referral-title"
+    class="rounded-2xl border border-gray-100 bg-white p-4 sm:p-5"
+  >
+    @if (referralLink(); as link) {
+      <div class="mt-3 flex flex-wrap items-center gap-4 sm:flex-nowrap">
+        <div #qr aria-label="Referral QR code" role="img" class="shrink-0">
+          <qrcode [qrdata]="link" elementType="svg" [width]="120" [margin]="4" />
+        </div>
+        <div class="min-w-0 flex-1 sm:max-w-xl">
+          <input
+            type="text"
+            readonly
+            [value]="link"
+            aria-label="Referral link"
+            class="h-10 w-full rounded-xl border border-gray-200 px-4 text-sm text-gray-600 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
+          />
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <app-button variant="secondary" size="compact" (onClick)="copyReferral()">
+              Copy link
+            </app-button>
+            <button
+              type="button"
+              class="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg bg-[linear-gradient(89.87deg,#0a136a_-17.83%,#00d4fc_141.24%)] px-3 py-2 text-sm/[1.5] font-medium text-white enabled:hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1C64F2] disabled:cursor-wait disabled:opacity-[0.65]"
+              [disabled]="downloadingQr()"
+              (click)="downloadReferralQr(qr)"
+            >
+              Download QR
+            </button>
+          </div>
+          @if (referralMessage()) {
+            <p role="status" class="mt-2 text-xs text-gray-600">{{ referralMessage() }}</p>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <p role="status" class="text-sm text-gray-600">
+          {{ loadingReferral() ? 'Loading referral link…' : 'Your referral link is unavailable.' }}
+        </p>
+        @if (!loadingReferral()) {
+          <app-button variant="secondary" size="compact" (onClick)="loadReferral()">
+            Retry referral link
+          </app-button>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- all Verify -->
+  <h2 class="text-base font-bold">User Verify</h2>
+  <div class="rounded-2xl border border-gray-100 bg-white p-4 sm:p-5">
+    <app-verify [embedded]="false" [titleShow]="false" />
+  </div>
+
+  <!-- active Sessions -->
+  <section aria-labelledby="active-sessions-title">
+    <h2 id="active-sessions-title" class="mb-4 font-bold">Active Sessions</h2>
+    @let sessions = sessionPage();
+    <div
+      class="overflow-x-auto rounded-2xl border border-gray-100 bg-white focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
+      role="region"
+      aria-label="Active sessions table"
+      tabindex="0"
+    >
+      <table class="w-full min-w-[440px] text-center text-sm">
+        <thead class="bg-blue-100">
+          <tr>
+            <th scope="col" class="px-4 py-4 font-semibold">Last Online</th>
+            <th scope="col" class="px-4 py-4 font-semibold">Browser</th>
+            <th scope="col" class="px-4 py-4 font-semibold">Location</th>
+            <th scope="col" class="px-4 py-4 font-semibold">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 text-gray-600">
+          @for (session of sessions.rows; track session.session_uid) {
+            <tr>
+              <td class="px-4 py-3 whitespace-nowrap tabular-nums">
+                {{ (sessionDate(session.session_latest) | date: 'yyyy-MM-dd HH:mm:ss') ?? '—' }}
+              </td>
+              <td class="px-4 py-3">{{ session.session_browser || 'Unknown' }}</td>
+              <td class="px-4 py-3">{{ session.session_city || 'Unknown' }}</td>
+              <td class="px-4 py-2">
+                @if (session.session_uid === currentSessionUid) {
+                  <img
+                    src="svg/icon/circle-check-glass-outline.svg"
+                    alt="Current session"
+                    title="Current session"
+                    class="mx-auto size-5 [filter:invert(53%)_sepia(97%)_saturate(442%)_hue-rotate(88deg)_brightness(88%)_contrast(98%)]"
+                  />
+                } @else {
+                  <button
+                    type="button"
+                    class="mx-auto grid size-9 cursor-pointer place-items-center rounded-lg hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                    [attr.aria-label]="
+                      'Sign out ' + (session.session_browser || 'unknown browser') + ' session'
+                    "
+                    aria-haspopup="dialog"
+                    [disabled]="loadingSessions() || revoking()"
+                    (click)="openRevoke(session)"
+                  >
+                    <img src="svg/icon/logout.svg" alt="" class="size-5" />
+                  </button>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="px-4 py-6">
+                @if (loadingSessions()) {
+                  <p role="status">Loading active sessions…</p>
+                } @else if (!sessionsError()) {
+                  <p>No active sessions found.</p>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
     </div>
-</section>
+    @if (sessionsError()) {
+      <div class="mt-2 flex flex-wrap items-center gap-3">
+        <p role="alert" class="text-sm text-red-700">{{ sessionsError() }}</p>
+        <app-button variant="secondary" size="compact" (onClick)="loadSessions(sessions.page)">
+          Retry
+        </app-button>
+      </div>
+    }
+    @if (sessions.page > 1 || sessions.hasNext) {
+      <nav aria-label="Active sessions pagination" class="mt-3 flex items-center justify-end gap-3">
+        <app-button
+          variant="secondary"
+          size="compact"
+          [disabled]="sessions.page === 1 || loadingSessions() || revoking()"
+          (onClick)="loadSessions(sessions.page - 1)"
+        >
+          Previous
+        </app-button>
+        <span class="text-sm text-gray-600">Page {{ sessions.page }}</span>
+        <app-button
+          variant="secondary"
+          size="compact"
+          [disabled]="!sessions.hasNext || loadingSessions() || revoking()"
+          (onClick)="loadSessions(sessions.page + 1)"
+        >
+          Next
+        </app-button>
+      </nav>
+    }
+  </section>
+</div>
+
+<!-- create live account -->
+@if (creatingAccount()) {
+  <app-create-account
+    type="live"
+    (closed)="closeCreateAccount($event)"
+    (created)="closeCreateAccount(true)"
+    (verificationRequired)="requireVerification()"
+  />
+}
+
+<!-- popup KYC -->
+@if (kycNotice(); as notice) {
+  <app-propup-kyc
+    [verificationRequired]="notice === 'wallet-kyc-required'"
+    (confirmed)="confirmIdentity()"
+    (closed)="kycNotice.set(null)"
+  />
+}
+
+<!-- card account -->
+@if (selectedAccountNumber(); as accountNumber) {
+  <app-card-wallet
+    [accountNumber]="accountNumber"
+    (closed)="selectedAccountNumber.set(null)"
+    (deleted)="loadWallets()"
+    (balanceRefreshRequested)="loadWallets()"
+  />
+}
+
+<!-- popup revoke -->
+@if (sessionToRevoke(); as session) {
+  <app-propup-revoke
+    [browser]="session.session_browser"
+    [device]="session.session_os"
+    [busy]="revoking()"
+    [error]="revokeError()"
+    (confirmed)="confirmRevoke()"
+    (cancelled)="sessionToRevoke.set(null)"
+  />
+}
