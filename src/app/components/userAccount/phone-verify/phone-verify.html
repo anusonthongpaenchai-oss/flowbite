@@ -1,0 +1,64 @@
+@let underReview = pending();
+@let verified = !underReview && isKyc() === 1;
+<article
+  class="flex h-full min-h-[258px] w-full flex-col items-center gap-4 rounded-2xl border p-4 text-center"
+  [class]="
+    underReview
+      ? 'border-gray-200 bg-white'
+      : verified
+        ? 'border-transparent bg-[#f3faf7]'
+        : 'border-yellow-100 bg-[#fffde9]'
+  "
+  aria-labelledby="phone-verify-title"
+>
+  @if (underReview) {
+    <span
+      aria-hidden="true"
+      class="size-12 shrink-0 bg-[#3f83f8]"
+      style="mask: url('svg/icon/phone-check.svg') center / contain no-repeat"
+    ></span>
+  } @else {
+    <img
+      src="svg/icon/phone-check.svg"
+      alt=""
+      aria-hidden="true"
+      class="size-12 shrink-0"
+      [class]="
+        verified
+          ? ''
+          : '[filter:brightness(0)_saturate(100%)_invert(72%)_sepia(87%)_saturate(2145%)_hue-rotate(9deg)_brightness(100%)_contrast(93%)]'
+      "
+    />
+  }
+  <h3
+    id="phone-verify-title"
+    class="min-h-12 w-full shrink-0 text-lg leading-6 font-bold text-black"
+  >
+    {{ underReview ? 'Phone Verification Pending' : 'Phone Verification' }}
+  </h3>
+  <p class="min-h-10 w-full shrink-0 text-sm leading-5 text-gray-500">
+    @if (underReview) {
+      Your phone verification is under review.
+    } @else if (verified) {
+      Your phone number is secured with OTP.
+    } @else {
+      Verify your phone number through KYC.
+    }
+  </p>
+  @if (verified) {
+    <div
+      class="mt-auto flex shrink-0 items-center gap-1 rounded-md bg-green-100 px-2.5 py-0.5 text-xs leading-[18px] font-medium text-green-800"
+    >
+      <img src="svg/icon/approve.svg" alt="" aria-hidden="true" class="size-2.5" />
+      <span>Already Verify</span>
+    </div>
+  } @else if (!underReview) {
+    <app-button
+      variant="ghost"
+      class="mt-auto min-h-[22px] shrink-0 underline [&_button]:text-yellow-700 [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-60"
+      [disabled]="disabled()"
+      (onClick)="verifyRequested.emit()"
+      >Verify</app-button
+    >
+  }
+</article>

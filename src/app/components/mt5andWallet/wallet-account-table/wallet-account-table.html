@@ -1,13 +1,16 @@
 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <input
-    #search
-    type="search"
-    aria-label="Search by account name or number"
-    placeholder="Search"
-    class="h-9 w-64 max-w-full rounded-lg border border-gray-300 bg-gray-50 px-3 text-sm placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
-    [value]="searchQuery()"
-    (input)="searchQuery.set(search.value)"
-  />
+  <ng-content select="[wallet-table-heading]" />
+  @if (showSearch()) {
+    <input
+      #search
+      type="search"
+      aria-label="Search by account name or number"
+      placeholder="Search"
+      class="h-9 w-64 max-w-full rounded-lg border border-gray-300 bg-gray-50 px-3 text-sm placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
+      [value]="searchQuery()"
+      (input)="searchQuery.set(search.value)"
+    />
+  }
   <label class="ml-auto flex items-center gap-3 text-xs font-medium">
     Filter
     <span class="relative">
@@ -29,6 +32,7 @@
       />
     </span>
   </label>
+    <ng-content select="[wallet-table-actions]" />
 </div>
 
 <div
@@ -38,7 +42,7 @@
   aria-label="Wallet accounts table"
 >
   <table class="w-full min-w-[760px] text-left text-sm">
-    <thead class="bg-blue-100 text-xs text-gray-900 uppercase whitespace-nowrap">
+    <thead class="bg-[#E1EFFE] text-xs text-gray-900 uppercase whitespace-nowrap">
       <tr>
         <th scope="col" class="w-[9%] px-4 py-4 font-semibold">Type</th>
         <th scope="col" class="w-[24%] px-4 py-4 font-semibold">Account Name</th>

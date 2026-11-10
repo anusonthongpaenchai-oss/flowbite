@@ -8,7 +8,6 @@ import { accountChildRoutes } from './components/layouts/account-layout/account.
 import { ForgotPassword } from './page/forgot-password/forgot-password';
 import { Verify } from './page/verify/verify';
 import { PortalLayout } from './components/layouts/portal-layout/portal-layout';
-import { Dashboard } from './page/dashboard/dashboard';
 import { walletKycGuard } from './wallet-kyc.guard';
 
 export const routes: Routes = [
@@ -28,7 +27,10 @@ export const routes: Routes = [
     canActivate: [() => authGuard() || inject(Router).createUrlTree(['/'])],
     canActivateChild: [() => authGuard() || inject(Router).createUrlTree(['/'])],
     children: [
-      { path: 'dashboard', component: Dashboard },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./page/dashboard/dashboard').then((m) => m.Dashboard),
+      },
       {
         path: 'mt5-wallet',
         canActivate: [walletKycGuard],

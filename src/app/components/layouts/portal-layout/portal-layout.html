@@ -42,7 +42,7 @@
     <app-navbar
       class="portal-navbar shrink-0 [&>header]:border [&>header]:border-[#f0f1f3]"
       [pageTitle]="pageTitle()"
-      [showLanguage]="activePage() !== 'wallet'"
+      [showLanguage]="activePage() === 'account'"
     >
       @if (!desktop()) {
         <button
@@ -66,7 +66,7 @@
           >Deposit</a
         >
       }
-      @if (activePage() === 'wallet') {
+      @if (activePage() === 'wallet' || activePage() === 'dashboard') {
         <app-button
           navbar-actions
           class="deposit-button"
@@ -79,7 +79,11 @@
       }
     </app-navbar>
     <div class="route-content mt-3 min-h-0 flex-1 lg:mt-4">
-      <router-outlet />
+      @for (sessionKey of [routeSessionKey()]; track sessionKey) {
+        @if (sessionKey !== null) {
+          <router-outlet />
+        }
+      }
     </div>
   </div>
 </div>

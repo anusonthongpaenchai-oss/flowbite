@@ -39,6 +39,7 @@ describe('PortalLayout and protected routes', () => {
   const getMock = vi.fn<typeof api.get>();
   const profileGetMock = vi.fn<typeof api.get>();
   const summaryGetMock = vi.fn<typeof api.get>();
+  const sessionsGetMock = vi.fn<typeof api.get>();
 
   beforeEach(async () => {
     clearAuthSession();
@@ -69,11 +70,9 @@ describe('PortalLayout and protected routes', () => {
         ({
           status: 200,
           data:
-            url === '/v1/verify/kyc'
-              ? { result: true, data: { kyc_stat: 1 } }
-              : url === '/v1/trading'
-                ? { result: true, data: [] }
-                : { result: true, data: { member, address: null, isTrusted: false } },
+            url === '/v1/trading'
+              ? { result: true, data: [] }
+              : { result: true, data: { member, address: null, isTrusted: false } },
         }) as ApiResponse,
     );
     profileGetMock.mockReset().mockResolvedValue({
@@ -91,9 +90,17 @@ describe('PortalLayout and protected routes', () => {
         },
       },
     } as ApiResponse);
+    sessionsGetMock.mockReset().mockResolvedValue({ data: { result: true, data: [] } } as ApiResponse);
     vi.spyOn(api, 'get').mockImplementation((url, config) => {
       if (url === '/v1/member/profile') return profileGetMock(url);
       if (url === '/v1/wallet/account-summary') return summaryGetMock(url, config);
+      if (url === '/v1/verify/kyc') {
+        return Promise.resolve({ data: { result: true, data: { kyc_stat: 1 } } } as ApiResponse);
+      }
+      if (url === '/v1/auth/sessions/active') return sessionsGetMock(url);
+      if (url === '/v1/member/referral-link') {
+        return Promise.resolve({ data: { result: true, data: { referralLink: '' } } } as ApiResponse);
+      }
       return getMock(url, ...(config ? [config] : []));
     });
     await TestBed.configureTestingModule({
@@ -145,7 +152,7 @@ describe('PortalLayout and protected routes', () => {
     expect(TestBed.inject(Router).url).toBe('/dashboard');
     expect(element.querySelector('app-mt5-wallet')).toBeNull();
     expect(element.querySelector('#wallet-kyc-dialog[open]')).not.toBeNull();
-    expect(profileGetMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
+    expect(profileGetMock).toHaveBeenCalledWith('/v1/member/profile');
     expect(getMock).not.toHaveBeenCalled();
   });
 
@@ -1185,7 +1192,9 @@ describe('PortalLayout and protected routes', () => {
     expect(element.querySelector('app-dashboard')).not.toBeNull();
     expect(element.querySelectorAll('app-navbar')).toHaveLength(1);
     expect(element.querySelector('.navbar-title')?.textContent?.trim()).toBe('Dashboard');
-    expect(element.querySelector('.deposit-button')).toBeNull();
+    expect(element.querySelector('.deposit-button button:disabled')?.textContent).toContain(
+      'Deposit',
+    );
     expect(element.querySelector('.account-header')).toBeNull();
     expect(element.querySelector('.account-panel')).toBeNull();
     expect(
@@ -1236,7 +1245,11 @@ describe('PortalLayout and protected routes', () => {
     element.querySelector<HTMLAnchorElement>('a[aria-label="Dashboard"]')!.click();
     await harness.fixture.whenStable();
     expect(TestBed.inject(Router).url).toBe('/dashboard');
-    expect(profileGetMock.mock.calls).toEqual([['/v1/member/profile'], ['/v1/member/profile']]);
+    expect(profileGetMock.mock.calls).toEqual([
+      ['/v1/member/profile'],
+      ['/v1/member/profile'],
+      ['/v1/member/profile'],
+    ]);
     expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
@@ -1256,6 +1269,62 @@ describe('PortalLayout and protected routes', () => {
     expect(harness.routeNativeElement!.querySelector('app-sidebar')).toBeNull();
     await harness.navigateByUrl('/dashboard', Login);
     expect(TestBed.inject(Router).url).toBe('/');
+  });
+
+  it.each(['session', 'different-session'])(
+    'replaces private Dashboard data when a remembered member changes with UID %s',
+    async (sessionUid) => {
+      sessionsGetMock.mockImplementation(async () => {
+        const current = getAuthSession();
+        return {
+          data: {
+            result: true,
+            data: [
+              {
+                session_uid: current?.sessionUid,
+                session_browser: current?.member.id === 1 ? 'Old browser' : 'New browser',
+              },
+            ],
+          },
+        } as ApiResponse;
+      });
+      setAuthSession(session, true);
+      await harness.navigateByUrl('/dashboard', PortalLayout);
+      await harness.fixture.whenStable();
+      const element = harness.routeNativeElement!;
+      expect(element.textContent).toContain('Old browser');
+
+      localStorage.setItem(
+        'authSession',
+        JSON.stringify({ ...session, member: { ...member, id: 2 }, sessionUid }),
+      );
+      window.dispatchEvent(new StorageEvent('storage', { key: 'authSession' }));
+      await harness.fixture.whenStable();
+
+      expect(TestBed.inject(Router).url).toBe('/dashboard');
+      expect(element.textContent).toContain('New browser');
+      expect(element.textContent).not.toContain('Old browser');
+      expect(element.querySelector('img[alt="Current session"]')).not.toBeNull();
+    },
+  );
+
+  it('blocks wallet loading when a remembered session switches to an unverified member', async () => {
+    setAuthSession(session, true);
+    await harness.navigateByUrl('/mt5-wallet', PortalLayout);
+    await harness.fixture.whenStable();
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
+
+    const nextMember = { ...member, id: 2, isKYC: 0 };
+    profileGetMock.mockResolvedValue({
+      data: { result: true, data: { member: nextMember } },
+    } as ApiResponse);
+    localStorage.setItem('authSession', JSON.stringify({ ...session, member: nextMember }));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'authSession' }));
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
+    expect(harness.routeNativeElement!.querySelector('a[href="/user/verify"]')).not.toBeNull();
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
   it('updates the sidebar after a profile save even when reloading the profile fails', async () => {

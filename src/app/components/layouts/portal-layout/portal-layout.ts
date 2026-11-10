@@ -31,8 +31,16 @@ export class PortalLayout {
   private readonly desktopQuery = window.matchMedia?.('(min-width: 1024px)');
   private readonly drawer = viewChild<ElementRef<HTMLDialogElement>>('drawer');
   private readonly menuButton = viewChild<ElementRef<HTMLButtonElement>>('menuButton');
+  private readonly suspendingWalletRoute = signal(false);
 
   readonly session = signal(getAuthSession());
+  // Recreate the routed view only when its authenticated identity changes.
+  protected readonly routeSessionKey = computed(() => {
+    const session = this.session();
+    return session && !this.suspendingWalletRoute()
+      ? JSON.stringify([session.member.id, session.sessionUid])
+      : null;
+  });
   readonly collapsed = signal(false);
   readonly desktop = signal(this.desktopQuery?.matches ?? true);
   readonly drawerOpen = signal(false);
@@ -60,6 +68,7 @@ export class PortalLayout {
       ) {
         this.walletAccounts.reset();
         if (session && this.activePage() === 'wallet') {
+          this.suspendingWalletRoute.set(true);
           void this.router.navigateByUrl('/dashboard', { replaceUrl: true });
         } else if (session) {
           this.walletKycNotice.set(null);
@@ -91,6 +100,7 @@ export class PortalLayout {
     this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
       if (event instanceof NavigationEnd) {
         this.activePage.set(this.pageFor(event.urlAfterRedirects));
+        this.suspendingWalletRoute.set(false);
         this.closeDrawer();
         const info = this.router.lastSuccessfulNavigation()?.extras.info;
         this.walletKycNotice.set(
@@ -148,7 +158,7 @@ export class PortalLayout {
     if (
       !session ||
       session.member.isKYC === 0 ||
-      this.activePage() === 'wallet' ||
+      this.activePage() !== 'account' ||
       this.walletAccounts.loadState() !== 'idle'
     ) {
       return;
@@ -162,7 +172,7 @@ export class PortalLayout {
       currentSession?.sessionUid === session.sessionUid &&
       currentSession.member.id === session.member.id &&
       !this.walletKycNotice() &&
-      this.activePage() !== 'wallet' &&
+      this.activePage() === 'account' &&
       this.walletAccounts.loadState() === 'idle'
     ) {
       await this.walletAccounts.load();
