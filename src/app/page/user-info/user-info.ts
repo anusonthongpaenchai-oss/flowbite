@@ -79,31 +79,6 @@ export class UserInfo implements OnInit {
   public phone = signal('');
   public phoneCode = signal('');
 
-  readonly formattedPhone = computed(() => {
-    const countryCode = this.phoneCode().replace(/\D/g, '');
-    const phone = this.phone().trim();
-    const international = phone.startsWith('+');
-    let number = phone.replace(/\D/g, '');
-
-    if (!number) {
-      return '';
-    }
-
-    if (international && (!countryCode || !number.startsWith(countryCode))) {
-      return `+${number}`;
-    }
-
-    if (countryCode && number.startsWith(countryCode) && (international || number.length > 10)) {
-      number = number.slice(countryCode.length);
-    }
-
-    if (countryCode === '66') {
-      number = number.replace(/^0(?=\d{9}$)/, '');
-    }
-
-    const formattedNumber = number.replace(/^(\d{2})(\d{3})(\d{4})$/, '$1-$2-$3');
-    return `${countryCode ? `+${countryCode}` : ''}${formattedNumber}`;
-  });
 
   // social info (mock)
   public googleLink = signal<boolean>(false);

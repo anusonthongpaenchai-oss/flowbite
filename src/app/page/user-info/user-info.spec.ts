@@ -186,6 +186,22 @@ describe('UserInfo', () => {
     expect(element.querySelector('[aria-labelledby="contact-title"]')?.textContent).toContain(
       'member@example.com',
     );
+    const addressSection = element.querySelector('[aria-labelledby="address-title"]');
+    expect(
+      Array.from(addressSection?.querySelectorAll('.info-row') ?? [], (row) => [
+        row.querySelector('dt')?.textContent?.trim(),
+        row.querySelector('dd')?.textContent?.trim(),
+      ]),
+    ).toEqual([
+      ['Address', '123 Main Road'],
+      ['Sub-district', 'Khlong Tan Nuea'],
+      ['District/City', 'Watthana'],
+      ['Province/State', 'Bangkok'],
+      ['ZIP/Postal code', '10110'],
+    ]);
+    expect(addressSection?.nextElementSibling?.getAttribute('aria-labelledby')).toBe(
+      'social-title',
+    );
     expect(element.querySelector('[role="status"]')).toBeNull();
     expect(element.querySelector('[role="alert"]')).toBeNull();
   });
@@ -218,7 +234,7 @@ describe('UserInfo', () => {
       }),
     );
 
-    render();
+    const element = render();
     await fixture.whenStable();
 
     expect(component.firstName()).toBe('Test');
@@ -228,6 +244,11 @@ describe('UserInfo', () => {
     expect(component.province()).toBe('');
     expect(component.zipCode()).toBe('');
     expect(component.errorMessage()).toBe('');
+    expect(
+      Array.from(element.querySelectorAll('[aria-labelledby="address-title"] dd'), (value) =>
+        value.textContent?.trim(),
+      ),
+    ).toEqual(['—', '—', '—', '—', '—']);
   });
 
   it('shows the backend error without filling the signals when the request is rejected', async () => {

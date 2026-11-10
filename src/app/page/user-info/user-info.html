@@ -121,38 +121,24 @@
         <dl
           class="details-list grid min-w-0 gap-1.5 min-[1000px]:gap-2.5 [@media(max-width:600px)]:gap-3"
         >
-          <div
-            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
-          >
-            <dt class="text-[0.95em] text-[#9ca3af]">First name (Eng)</dt>
-            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
-              {{ firstName() || '—' }}
-            </dd>
-          </div>
-          <div
-            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
-          >
-            <dt class="text-[0.95em] text-[#9ca3af]">Last name (Eng)</dt>
-            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
-              {{ lastName() || '—' }}
-            </dd>
-          </div>
-          <div
-            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
-          >
-            <dt class="text-[0.95em] text-[#9ca3af]">Gender</dt>
-            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
-              {{ gender() || '—' }}
-            </dd>
-          </div>
-          <div
-            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
-          >
-            <dt class="text-[0.95em] text-[#9ca3af]">Country</dt>
-            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
-              {{ country() || '—' }}
-            </dd>
-          </div>
+          @for (
+            field of [
+              { label: 'First name (Eng)', value: firstName() },
+              { label: 'Last name (Eng)', value: lastName() },
+              { label: 'Gender', value: gender() },
+              { label: 'Country', value: country() },
+            ];
+            track field.label
+          ) {
+            <div
+              class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+            >
+              <dt class="text-[0.95em] text-[#9ca3af]">{{ field.label }}</dt>
+              <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+                {{ field.value || '—' }}
+              </dd>
+            </div>
+          }
         </dl>
       </section>
 
@@ -164,22 +150,52 @@
         <dl
           class="details-list grid min-w-0 gap-1.5 min-[1000px]:gap-2.5 [@media(max-width:600px)]:gap-3"
         >
-          <div
-            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
-          >
-            <dt class="text-[0.95em] text-[#9ca3af]">Email</dt>
-            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
-              {{ email() || '—' }}
-            </dd>
-          </div>
-          <div
-            class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
-          >
-            <dt class="text-[0.95em] text-[#9ca3af]">Phone number</dt>
-            <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
-              {{ formattedPhone() || '—' }}
-            </dd>
-          </div>
+          @for (
+            field of [
+              { label: 'Email', value: email() },
+              { label: 'Phone number', value: phone() },
+            ];
+            track field.label
+          ) {
+            <div
+              class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+            >
+              <dt class="text-[0.95em] text-[#9ca3af]">{{ field.label }}</dt>
+              <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+                {{ field.value || '—' }}
+              </dd>
+            </div>
+          }
+        </dl>
+      </section>
+
+      <section
+        class="details-section mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 [@media(max-width:600px)]:mt-6 [@media(max-width:600px)]:grid-cols-1"
+        aria-labelledby="address-title"
+      >
+        <h3 id="address-title" class="text-[1.15em] font-bold">Address</h3>
+        <dl
+          class="details-list grid min-w-0 gap-1.5 min-[1000px]:gap-2.5 [@media(max-width:600px)]:gap-3"
+        >
+          @for (
+            field of [
+              { label: 'Address', value: address() },
+              { label: 'Sub-district', value: subDistrict() },
+              { label: 'District/City', value: district() },
+              { label: 'Province/State', value: province() },
+              { label: 'ZIP/Postal code', value: zipCode() },
+            ];
+            track field.label
+          ) {
+            <div
+              class="info-row grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] [align-items:start] gap-2"
+            >
+              <dt class="text-[0.95em] text-[#9ca3af]">{{ field.label }}</dt>
+              <dd class="m-0 min-w-0 text-right text-[#111] [overflow-wrap:anywhere]">
+                {{ field.value || '—' }}
+              </dd>
+            </div>
+          }
         </dl>
       </section>
 
