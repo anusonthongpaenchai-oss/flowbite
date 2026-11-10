@@ -261,6 +261,11 @@ export class Verify implements OnInit {
   }
 
   public onDialogCancel(event: Event): void {
+    // The file picker also emits a cancel event that bubbles to the dialog.
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
     event.preventDefault();
     this.closeVerification();
   }

@@ -55,6 +55,7 @@ export class UserInfo implements OnInit {
   // user info
   public memberId = signal<number>(0);
   public imgUrl = signal<string>('');
+  private readonly isKyc = signal<0 | 1 | undefined>(undefined);
 
   // general info
   public firstName = signal('');
@@ -63,6 +64,9 @@ export class UserInfo implements OnInit {
   public country = signal('');
 
   // edit profile
+  readonly canEditProfile = computed(
+    () => !this.isLoading() && !this.isUpdating() && !!this.memberId() && this.isKyc() === 0,
+  );
   readonly fullName = computed(
     () => [this.firstName(), this.lastName()].filter(Boolean).join(' ') || '—',
   );
@@ -159,7 +163,7 @@ export class UserInfo implements OnInit {
   }
 
   public openEditProfile(): void {
-    if (this.isLoading() || this.isUpdating() || !this.memberId()) {
+    if (!this.canEditProfile()) {
       return;
     }
     this.updateErrorMessage.set('');
@@ -270,6 +274,7 @@ export class UserInfo implements OnInit {
 
   private async loadUserInfo(): Promise<void> {
     this.isLoading.set(true);
+    this.isKyc.set(undefined);
     this.errorMessage.set('');
 
     try {
@@ -279,7 +284,7 @@ export class UserInfo implements OnInit {
         throw new Error(response?.message || 'Unable to load your profile. Please try again.');
       }
 
-      const { member, address, isTrusted } = response.data;
+      const { member, address, isTrusted, isKyc, isKYC } = response.data;
       this.synchronizeSessionMember(
         {
           id: member.id,
@@ -293,6 +298,7 @@ export class UserInfo implements OnInit {
 
       this.memberId.set(member.id ?? 0);
       this.imgUrl.set(member.m_image_url ?? '');
+      this.isKyc.set(member.isKyc ?? member.isKYC ?? isKyc ?? isKYC);
 
       this.firstName.set(member.m_name ?? '');
       this.lastName.set(member.m_lastname ?? '');

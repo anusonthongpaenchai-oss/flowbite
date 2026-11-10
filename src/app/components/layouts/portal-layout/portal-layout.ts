@@ -14,7 +14,7 @@ import { Navbar } from '../../navbar/navbar';
 import { Button } from '../../ui/button/button';
 import { getAuthSession, onAuthSessionChange } from '../../../../shared/guard/auth';
 import { WalletAccounts } from '../../../page/mt5-wallet/wallet-accounts';
-import type { WalletKycNotice } from '../../../../shared/guard/wallet-kyc';
+import { checkWalletKyc, type WalletKycNotice } from '../../../../shared/guard/wallet-kyc';
 import { PropupKyc } from '../../propup-kyc/propup-kyc';
 
 @Component({
@@ -37,6 +37,8 @@ export class PortalLayout {
   readonly desktop = signal(this.desktopQuery?.matches ?? true);
   readonly drawerOpen = signal(false);
   protected readonly walletKycNotice = signal<WalletKycNotice | null>(null);
+  protected readonly availableBalance = this.walletAccounts.mainBalance;
+  protected readonly pointsCredit = this.walletAccounts.pointsCredit;
   readonly activePage = signal(this.pageFor(this.router.url));
   readonly pageTitle = computed(() => {
     const titles: Record<PortalPage, string> = {
@@ -59,7 +61,12 @@ export class PortalLayout {
         this.walletAccounts.reset();
         if (session && this.activePage() === 'wallet') {
           void this.router.navigateByUrl('/dashboard', { replaceUrl: true });
+        } else if (session) {
+          this.walletKycNotice.set(null);
+          void this.loadSidebarWallets();
         }
+      } else if (session?.member.isKYC === 1 && previousSession?.member.isKYC !== 1) {
+        void this.loadSidebarWallets();
       }
       if (!session) {
         this.closeDrawer();
@@ -89,6 +96,11 @@ export class PortalLayout {
         this.walletKycNotice.set(
           info === 'wallet-kyc-required' || info === 'wallet-kyc-unavailable' ? info : null,
         );
+        if (this.walletKycNotice()) {
+          this.walletAccounts.reset();
+        } else {
+          void this.loadSidebarWallets();
+        }
       }
     });
   }
@@ -129,6 +141,32 @@ export class PortalLayout {
       event.clientY > rect.bottom
     )
       this.closeDrawer();
+  }
+
+  private async loadSidebarWallets(): Promise<void> {
+    const session = this.session();
+    if (
+      !session ||
+      session.member.isKYC === 0 ||
+      this.activePage() === 'wallet' ||
+      this.walletAccounts.loadState() !== 'idle'
+    ) {
+      return;
+    }
+
+    const kycStatus = await checkWalletKyc();
+    const currentSession = this.session();
+    if (
+      kycStatus === 'verified' &&
+      !this.destroyRef.destroyed &&
+      currentSession?.sessionUid === session.sessionUid &&
+      currentSession.member.id === session.member.id &&
+      !this.walletKycNotice() &&
+      this.activePage() !== 'wallet' &&
+      this.walletAccounts.loadState() === 'idle'
+    ) {
+      await this.walletAccounts.load();
+    }
   }
 
   private pageFor(url: string): PortalPage {

@@ -17,6 +17,8 @@ type GetAllWalletResponseData = {
   member_id: number;
   wallet_account_no: string;
   wallet_balance: number;
+  wallet_currency?: string | null;
+  wallet_credit?: number | string | null;
   wallet_equity?: number | string | null;
   wallet_status: number;
 };

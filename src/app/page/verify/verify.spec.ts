@@ -1240,6 +1240,37 @@ describe('Verify KYC flow', () => {
     expect(postMock).not.toHaveBeenCalled();
   });
 
+  it('keeps ID Proof open when cancelling the file picker and allows another selection', async () => {
+    await enterImageStage();
+    selectIdType('Passport');
+    const dialog = verificationDialog();
+    const fileInput = imageInput()!;
+    const openPicker = vi.spyOn(fileInput, 'click').mockImplementation(() => {});
+
+    button('Browse File')!.click();
+    fileInput.dispatchEvent(new Event('cancel', { bubbles: true }));
+    await fixture.whenStable();
+
+    expect(dialog.open).toBe(true);
+    expect(component.step()).toBe('id-proof');
+    expect(input('kycIdType')?.value).toBe('Passport');
+
+    button('Browse File')!.click();
+    const file = new File(['image-data'], 'id.png', { type: 'image/png' });
+    selectImageFile(file);
+    await vi.waitFor(() => expect(component.idImagePreview()).not.toBe(''));
+    await fixture.whenStable();
+
+    button('Change image')!.click();
+    fileInput.dispatchEvent(new Event('cancel', { bubbles: true }));
+    await fixture.whenStable();
+
+    expect(dialog.open).toBe(true);
+    expect(component.selectedIdFile()).toBe(file);
+    expect(openPicker).toHaveBeenCalledTimes(3);
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
   it('keeps image selection local without uploading or submitting KYC', async () => {
     useProfile({
       ...profile,

@@ -619,6 +619,30 @@ describe('UserInfo', () => {
     ).toHaveLength(1);
   });
 
+  it.each([
+    [{ isKyc: 0, isKYC: 1 }, false],
+    [{ isKyc: 1, isKYC: 0 }, true],
+    [{ isKYC: 1 }, true],
+    [{ isKYC: undefined }, true],
+  ] as const)('sets Edit Profile availability for KYC flags %j', async (flags, disabled) => {
+    getMock.mockResolvedValueOnce({
+      status: 200,
+      data: {
+        ...profile,
+        data: { ...profile.data, member: { ...profile.data.member, ...flags } },
+      },
+    } as ApiResponse);
+
+    const element = render();
+    await fixture.whenStable();
+    const editButton = findButton(element, 'Edit Profile');
+
+    expect(editButton.disabled).toBe(disabled);
+    editButton.click();
+    await fixture.whenStable();
+    expect(element.querySelector('app-edit-profile') === null).toBe(disabled);
+  });
+
   it('cancels the password form and starts a new flow when reopened', async () => {
     const element = render();
     await fixture.whenStable();

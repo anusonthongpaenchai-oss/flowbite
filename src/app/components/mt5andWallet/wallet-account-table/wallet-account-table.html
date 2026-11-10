@@ -1,34 +1,87 @@
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <input
+    #search
+    type="search"
+    aria-label="Search by account name or number"
+    placeholder="Search"
+    class="h-9 w-64 max-w-full rounded-lg border border-gray-300 bg-gray-50 px-3 text-sm placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
+    [value]="searchQuery()"
+    (input)="searchQuery.set(search.value)"
+  />
+  <label class="ml-auto flex items-center gap-3 text-xs font-medium">
+    Filter
+    <span class="relative">
+      <select
+        #typeFilter
+        aria-label="Filter by account type"
+        class="h-9 cursor-pointer appearance-none rounded-lg border border-gray-200 bg-white pr-8 pl-2 text-xs text-gray-600 focus-visible:outline-2 focus-visible:outline-[#1C64F2] forced-colors:appearance-auto"
+        (change)="selectedType.set(typeFilter.value)"
+      >
+        <option value="">Type : All</option>
+        @for (type of types(); track type) {
+          <option [value]="type">Type : {{ type | titlecase }}</option>
+        }
+      </select>
+      <img
+        src="svg/icon/Vector.svg"
+        alt=""
+        class="pointer-events-none absolute top-1/2 right-3 size-3 -translate-y-1/2 -rotate-90 object-contain forced-colors:hidden"
+      />
+    </span>
+  </label>
+</div>
+
 <div
-  class="overflow-x-auto rounded-xl border border-gray-100 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
+  class="overflow-x-auto rounded-2xl border border-gray-100 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
   tabindex="0"
   role="region"
   aria-label="Wallet accounts table"
 >
-  <table class="w-full min-w-[580px] text-left text-sm">
-    <thead class="bg-gray-50 text-xs font-medium text-gray-600">
+  <table class="w-full min-w-[760px] text-left text-sm">
+    <thead class="bg-blue-100 text-xs text-gray-900 uppercase whitespace-nowrap">
       <tr>
-        <th scope="col" class="px-4 py-3">Account</th>
-        <th scope="col" class="px-4 py-3">Category</th>
-        <th scope="col" class="px-4 py-3">Type</th>
-        <th scope="col" class="px-4 py-3">Account Number</th>
-        <th scope="col" class="px-4 py-3 text-right">Balance</th>
-        <th scope="col" class="px-4 py-3 text-right">Equity</th>
+        <th scope="col" class="w-[9%] px-4 py-4 font-semibold">Type</th>
+        <th scope="col" class="w-[24%] px-4 py-4 font-semibold">Account Name</th>
+        <th scope="col" class="w-[24%] px-4 py-4 font-semibold">Account Number</th>
+        <th scope="col" class="px-4 py-4 font-semibold">Balance</th>
+        <th scope="col" class="px-4 py-4 font-semibold">Credit</th>
+        <th scope="col" class="px-4 py-4 font-semibold">Equity</th>
+        <th scope="col" class="px-4 py-4 font-semibold">Social Trade</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-100">
-      @for (account of accounts(); track account.id) {
+    <tbody class="divide-y divide-gray-100 text-gray-600">
+      @for (row of pageRows(); track row.account.id) {
+        @let account = row.account;
         @let accountNumber = account.number.trim();
-        @let canOpenDetails = account.status === 1 && accountNumber !== '' && accountNumber !== '—';
+        @let canOpenDetails =
+          account.status === 1 &&
+          (account.type === 'main' || (accountNumber !== '' && accountNumber !== '—'));
         <tr
           [class]="canOpenDetails ? 'cursor-pointer hover:bg-gray-50 focus-within:bg-gray-50' : ''"
           [attr.aria-disabled]="account.status === 0 ? 'true' : null"
-          (click)="canOpenDetails && detailsRequested.emit(accountNumber)"
+          (click)="canOpenDetails && openDetails(account)"
         >
-          <th scope="row" class="px-4 py-3 font-medium wrap-break-word">
+          <td class="px-4 py-4">
+            <span
+              class="rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap"
+              [class]="
+                row.type === 'wallet'
+                  ? 'bg-[#DEF7EC] text-[#03543F]'
+                  : row.type === 'live'
+                    ? 'bg-[#FDF6B2] text-[#723B13] uppercase'
+                    : row.type === 'inactive'
+                      ? 'bg-[#FDE8E8] text-[#9B1C1C]'
+                      : 'bg-[#F3F4F6] text-[#111928]'
+              "
+            >
+              {{ row.type | titlecase }}
+            </span>
+          </td>
+          <th scope="row" class="px-4 py-4 font-normal wrap-break-word">
             @if (canOpenDetails) {
               <button
                 type="button"
-                class="cursor-pointer rounded-sm text-left text-[#1C64F2] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1C64F2]"
+                class="cursor-pointer rounded-sm text-left hover:text-[#1C64F2] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1C64F2]"
                 aria-haspopup="dialog"
                 [attr.aria-label]="'View details for ' + account.name"
               >
@@ -38,17 +91,86 @@
               {{ account.name }}
             }
           </th>
-          <td class="px-4 py-3">{{ (account.tradingType | titlecase) || 'Other' }}</td>
-          <td class="px-4 py-3">{{ account.type | titlecase }}</td>
-          <td class="px-4 py-3 tabular-nums">{{ account.number }}</td>
-          <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-            {{ (account.balance | currency: 'USD') ?? '—' }}
-          </td>
-          <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-            {{ (account.equity | currency: 'USD') ?? '—' }}
-          </td>
+          <td class="px-4 py-4 tabular-nums">{{ account.number }}</td>
+          @for (amount of [account.balance, account.credit, account.equity]; track $index) {
+            <td class="px-4 py-4 whitespace-nowrap tabular-nums">
+              @if (amount !== null) {
+                {{ amount | number: (amount % 1 === 0 ? '1.0-0' : '1.2-2') }} {{ account.currency }}
+              } @else {
+                —
+              }
+            </td>
+          }
+          <td class="px-4 py-4">—</td>
+        </tr>
+      } @empty {
+        <tr>
+          <td colspan="7" class="px-4 py-8 text-center">No accounts found.</td>
         </tr>
       }
     </tbody>
   </table>
 </div>
+
+<div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+  <p role="status" class="tabular-nums">
+    @if (total() > 0) {
+      Showing
+      <strong class="font-semibold text-gray-900">{{ startIndex() + 1 }}-{{ endIndex() }}</strong>
+    } @else {
+      Showing <strong class="font-semibold text-gray-900">0</strong>
+    }
+    of <strong class="font-semibold text-gray-900">{{ total() }}</strong>
+  </p>
+  @if (pageCount() > 0) {
+    <nav
+      aria-label="Account pagination"
+      class="ml-auto inline-flex divide-x divide-gray-300 rounded-md border border-gray-300 tabular-nums [&>*]:inline-flex [&>*]:min-h-8 [&>*]:min-w-8 [&>*]:items-center [&>*]:justify-center [&>*]:px-2 [&>button]:cursor-pointer [&>button]:hover:bg-gray-50 [&>button]:focus-visible:outline-2 [&>button]:focus-visible:-outline-offset-2 [&>button]:focus-visible:outline-[#1C64F2] [&>button]:disabled:cursor-default [&>button]:disabled:opacity-40"
+    >
+      <button
+        type="button"
+        aria-label="Previous page"
+        [disabled]="page() === 1"
+        (click)="page.set(page() - 1)"
+      >
+        <img src="svg/icon/Vector.svg" alt="" class="h-2.5 w-1.5" />
+      </button>
+      @for (pageNumber of pageNumbers(); track pageNumber === null ? 'gap-' + $index : pageNumber) {
+        @if (pageNumber === null) {
+          <span aria-hidden="true">…</span>
+        } @else {
+          <button
+            type="button"
+            class="aria-[current=page]:bg-blue-100 aria-[current=page]:font-semibold aria-[current=page]:text-blue-700"
+            [attr.aria-current]="page() === pageNumber ? 'page' : null"
+            [attr.aria-label]="'Page ' + pageNumber"
+            (click)="page.set(pageNumber)"
+          >
+            {{ pageNumber }}
+          </button>
+        }
+      }
+      <button
+        type="button"
+        aria-label="Next page"
+        [disabled]="page() === pageCount()"
+        (click)="page.set(page() + 1)"
+      >
+        <img src="svg/icon/Vector.svg" alt="" class="h-2.5 w-1.5 rotate-180" />
+      </button>
+    </nav>
+  }
+</div>
+
+@if (selectedWallet(); as wallet) {
+  <app-main-wallet-card
+    [balanceLabel]="
+      (wallet.balance
+        | currency
+          : 'USD'
+          : 'symbol'
+          : (wallet.balance !== null && wallet.balance % 1 !== 0 ? '1.2-2' : '1.0-0')) ?? '—'
+    "
+    (closed)="selectedWallet.set(null)"
+  />
+}

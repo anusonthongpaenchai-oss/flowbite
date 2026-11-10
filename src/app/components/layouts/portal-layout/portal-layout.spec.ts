@@ -38,6 +38,7 @@ describe('PortalLayout and protected routes', () => {
   let media: MediaQueryList;
   const getMock = vi.fn<typeof api.get>();
   const profileGetMock = vi.fn<typeof api.get>();
+  const summaryGetMock = vi.fn<typeof api.get>();
 
   beforeEach(async () => {
     clearAuthSession();
@@ -81,11 +82,20 @@ describe('PortalLayout and protected routes', () => {
         data: { member: { ...member, isKYC: 1 }, address: null, isTrusted: false },
       },
     } as ApiResponse);
-    vi.spyOn(api, 'get').mockImplementation((url, config) =>
-      url === '/v1/member/profile'
-        ? profileGetMock(url)
-        : getMock(url, ...(config ? [config] : [])),
-    );
+    summaryGetMock.mockReset().mockResolvedValue({
+      data: {
+        result: true,
+        data: {
+          demo: { current: 0, max: 7, remaining: 7, limitType: 'count' },
+          live: { current: 2, max: 5, remaining: 3, limitType: 'count' },
+        },
+      },
+    } as ApiResponse);
+    vi.spyOn(api, 'get').mockImplementation((url, config) => {
+      if (url === '/v1/member/profile') return profileGetMock(url);
+      if (url === '/v1/wallet/account-summary') return summaryGetMock(url, config);
+      return getMock(url, ...(config ? [config] : []));
+    });
     await TestBed.configureTestingModule({
       providers: [provideRouter(routes)],
     }).compileComponents();
@@ -250,6 +260,7 @@ describe('PortalLayout and protected routes', () => {
       options: [1, 10, 20, 50, 100, 200, 300, 500],
       option: 2,
       name: '',
+      limit: 'Limit: 0/7',
     },
     {
       mode: 'Live',
@@ -258,6 +269,7 @@ describe('PortalLayout and protected routes', () => {
       options: [50, 100, 200, 500, 777, 1000, 2000],
       option: 4,
       name: 'My live account',
+      limit: 'Wallet Limit: 2/5',
     },
   ] as const)('creates a $mode wallet and reloads the account list', async (entry) => {
     const createdWallet = {
@@ -290,6 +302,8 @@ describe('PortalLayout and protected routes', () => {
     const dialog = page.querySelector('dialog')!;
     expect(dialog.open).toBe(true);
     expect(dialog.querySelector('h2')?.textContent?.trim()).toBe(`Open ${entry.mode} Account`);
+    await vi.waitFor(() => expect(dialog.textContent).toContain(entry.limit));
+    expect(summaryGetMock.mock.calls.map(([url]) => url)).toEqual(['/v1/wallet/account-summary']);
     const select = dialog.querySelector<HTMLSelectElement>('[formControlName="accountType"]')!;
     expect([...select.options].slice(1).map(({ text }) => text)).toEqual([
       'Real',
@@ -360,6 +374,7 @@ describe('PortalLayout and protected routes', () => {
       unconfirmed: true,
     },
   ])('keeps the form open after a $label and prevents duplicate submission', async (entry) => {
+    summaryGetMock.mockRejectedValueOnce(new Error('Summary unavailable'));
     getMock
       .mockResolvedValue({ data: { result: true, data: [] } } as ApiResponse)
       .mockResolvedValueOnce({ data: { result: true, data: [] } } as ApiResponse)
@@ -377,6 +392,7 @@ describe('PortalLayout and protected routes', () => {
       .click();
     await harness.fixture.whenStable();
     const dialog = page.querySelector('dialog')!;
+    expect(dialog.textContent).toContain('Wallet Limit: —');
     const select = dialog.querySelector<HTMLSelectElement>('[formControlName="accountType"]')!;
     select.selectedIndex = 1;
     select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -408,7 +424,7 @@ describe('PortalLayout and protected routes', () => {
     }
   });
 
-  it('filters wallets by status and type and makes inactive wallets read-only in both views', async () => {
+  it('keeps grid tabs independent of the table type filter and shows inactive rows as read-only', async () => {
     await open();
     const element = harness.routeNativeElement!;
     const wallet = (id: number, name: string, type: string, tradingType: string, status = 1) => ({
@@ -420,6 +436,8 @@ describe('PortalLayout and protected routes', () => {
       wallet_trading_type: tradingType,
       wallet_account_no: `000${id}`,
       wallet_balance: id === 3 ? 250.5 : 0,
+      wallet_credit: id === 1 ? 12.5 : null,
+      wallet_currency: id === 1 ? 'USC' : null,
       balance: 999,
       wallet_leverage: 100,
       status: 1,
@@ -435,9 +453,9 @@ describe('PortalLayout and protected routes', () => {
         data: [
           wallet(1, 'Live Alpha', 'trading', ' LIVE '),
           wallet(2, 'Funded Beta', 'trading', 'funded'),
+          wallet(5, 'Archived Wallet', 'main', 'inactive', 0),
           wallet(3, 'Main Gamma', 'main', 'wallet'),
           wallet(4, 'Closed Delta', 'trading', 'live', 0),
-          wallet(5, 'Archived Wallet', 'main', 'inactive', 0),
           wallet(6, 'Deleted Wallet', 'trading', 'deleted', 2),
           wallet(7, 'Uncategorized', 'trading', '', 0),
           wallet(8, 'Funded Echo', 'trading', ' FUNDED '),
@@ -463,13 +481,14 @@ describe('PortalLayout and protected routes', () => {
     expect(element.querySelector('.navbar-title')?.textContent).toContain('MT5 & Wallet');
     const walletPage = element.querySelector('app-mt5-wallet')!;
     expect(walletPage.textContent).toContain('250.50 USD');
-    expect(element.querySelector('.balance-summary strong')?.textContent?.trim()).toBe('$3,000');
+    expect(element.querySelector('.balance-summary strong')?.textContent?.trim()).toBe('$250.50');
     const tabButtons = walletPage.querySelectorAll('[aria-label="Account type"] button');
     expect([...tabButtons].map((button) => button.textContent?.trim())).toEqual([
       'All',
       'Live',
       'Funded',
       'Demo',
+      'Wallet',
       'Inactive',
     ]);
     expect(tabButtons[0].getAttribute('aria-pressed')).toBe('true');
@@ -480,9 +499,19 @@ describe('PortalLayout and protected routes', () => {
       await harness.fixture.whenStable();
     };
     const visibleCards = () =>
-      [...walletPage.querySelectorAll('article h3')].map((title) => title.textContent?.trim());
+      [...walletPage.querySelectorAll('app-wallet-account-card h3')].map((title) =>
+        title.textContent?.trim(),
+      );
+    const mainWallet = () => walletPage.querySelector('app-main-wallet');
 
     expect(visibleCards()).toEqual(['Live Alpha', 'Funded Beta', 'Funded Echo', 'Demo Account']);
+    expect(mainWallet()?.textContent).toContain('$250.50');
+    expect(walletPage.querySelector('app-main-wallet, app-wallet-account-card')).toBe(mainWallet());
+    await click('Wallet');
+    expect(mainWallet()?.textContent).toContain('$250.50');
+    expect(visibleCards()).toEqual([]);
+    expect(walletPage.textContent).not.toContain('No accounts found.');
+    await click('All');
     expect(walletPage.textContent).toContain('$0');
     for (const [label, names] of [
       ['Live', ['Live Alpha']],
@@ -492,6 +521,7 @@ describe('PortalLayout and protected routes', () => {
     ] as const) {
       await click(label);
       expect(visibleCards()).toEqual(names);
+      expect(mainWallet()).toBeNull();
     }
     for (const card of walletPage.querySelectorAll('article')) {
       expect([...card.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
@@ -500,7 +530,26 @@ describe('PortalLayout and protected routes', () => {
     await harness.fixture.whenStable();
     expect(walletPage.querySelector('app-card-wallet')).toBeNull();
     await click('Table View');
+    expect(walletPage.querySelector('[aria-label="Account type"] button')).toBeNull();
+    expect(mainWallet()).toBeNull();
     const table = walletPage.querySelector('table')!;
+    expect(table.tBodies[0].rows).toHaveLength(5);
+    expect(table.textContent).toContain('12.50 USC');
+    expect(table.textContent).not.toContain('Closed Delta');
+    expect(table.textContent).not.toContain('Uncategorized');
+    expect(table.textContent).not.toContain('Live Bonus');
+    expect(table.textContent).not.toContain('Demo Bonus');
+    expect(table.textContent).not.toContain('Deleted Wallet');
+
+    const filter = walletPage.querySelector<HTMLSelectElement>(
+      'select[aria-label="Filter by account type"]',
+    )!;
+    const selectType = async (type: string) => {
+      filter.value = type;
+      filter.dispatchEvent(new Event('change'));
+      await harness.fixture.whenStable();
+    };
+    await selectType('inactive');
     expect(table.tBodies[0].rows).toHaveLength(2);
     expect(table.textContent).toContain('0004');
     expect(table.textContent).not.toContain('Live Alpha');
@@ -508,14 +557,70 @@ describe('PortalLayout and protected routes', () => {
     table.tBodies[0].rows[0].click();
     await harness.fixture.whenStable();
     expect(walletPage.querySelector('app-card-wallet')).toBeNull();
-    await click('All');
-    expect(table.tBodies[0].rows).toHaveLength(4);
-    expect(table.textContent).not.toContain('Live Bonus');
-    expect(table.textContent).not.toContain('Demo Bonus');
-    expect(table.textContent).not.toContain('Closed Delta');
-    expect(table.textContent).not.toContain('Deleted Wallet');
-    expect(table.querySelectorAll('tbody button')).toHaveLength(4);
-    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
+    await selectType('wallet');
+    expect(table.tBodies[0].rows).toHaveLength(1);
+    expect(table.textContent).toContain('Main Gamma');
+    table.querySelector<HTMLButtonElement>('tbody button')!.click();
+    await harness.fixture.whenStable();
+    expect(walletPage.querySelector('app-main-wallet-card dialog[open]')).not.toBeNull();
+    await click('Grid View');
+    expect(visibleCards()).toEqual(['Closed Delta', 'Uncategorized']);
+    expect(walletPage.querySelector('table')).toBeNull();
+    expect(walletPage.querySelector('input[type="search"]')).toBeNull();
+    expect(getMock.mock.calls).toEqual([['/v1/trading'], ['/v1/trading']]);
+  });
+
+  it('searches all table pages by name and number and combines search with the type filter', async () => {
+    const accounts = Array.from({ length: 12 }, (_, index) => ({
+      id: index + 1,
+      wallet_account_name: index === 11 ? 'Last Account' : `Account ${index + 1}`,
+      wallet_account_no: `000${index + 1}`,
+      wallet_type: 'trading',
+      wallet_trading_type: index === 11 ? 'demo' : 'live',
+      wallet_status: 1,
+    }));
+    getMock.mockResolvedValueOnce({
+      status: 200,
+      data: { result: true, data: accounts },
+    } as ApiResponse);
+    await open('/mt5-wallet');
+    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
+    [...page.querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Table View')!
+      .click();
+    await harness.fixture.whenStable();
+
+    const rows = () => page.querySelectorAll('tbody tr');
+    expect(rows()).toHaveLength(10);
+    page.querySelector<HTMLButtonElement>('button[aria-label="Next page"]')!.click();
+    await harness.fixture.whenStable();
+    expect(rows()).toHaveLength(2);
+    expect(page.textContent?.replace(/\s+/g, ' ')).toContain('Showing 11-12 of 12');
+
+    const search = page.querySelector<HTMLInputElement>('input[type="search"]')!;
+    const searchFor = async (query: string) => {
+      search.value = query;
+      search.dispatchEvent(new Event('input'));
+      await harness.fixture.whenStable();
+    };
+    await searchFor('  LAST account  ');
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].textContent).toContain('00012');
+    await searchFor('00012');
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].textContent).toContain('Last Account');
+
+    const filter = page.querySelector<HTMLSelectElement>(
+      'select[aria-label="Filter by account type"]',
+    )!;
+    filter.value = 'live';
+    filter.dispatchEvent(new Event('change'));
+    await harness.fixture.whenStable();
+    expect(page.textContent).toContain('No accounts found.');
+
+    await searchFor('');
+    expect(rows()).toHaveLength(10);
+    expect(page.textContent?.replace(/\s+/g, ' ')).toContain('Showing 1-10 of 11');
   });
 
   it('opens wallet details by account number and reveals each password only on request', async () => {
@@ -978,7 +1083,7 @@ describe('PortalLayout and protected routes', () => {
       expect(getMock).toHaveBeenLastCalledWith('/v1/wallet/user/0002', expect.anything());
       const dialog = page.querySelector<HTMLDialogElement>('app-card-wallet dialog');
       expect(dialog?.open).toBe(true);
-      expect(dialog?.textContent).toContain('#14966');
+      expect(dialog?.textContent).toContain('#0002');
     });
   });
 
@@ -1004,10 +1109,10 @@ describe('PortalLayout and protected routes', () => {
       [...page.querySelectorAll('[aria-label="Account type"] button')].map((button) =>
         button.textContent?.trim(),
       ),
-    ).toEqual(['All', 'Inactive']);
+    ).toEqual(['All', 'Wallet', 'Inactive']);
   });
 
-  it('shows the wallet total as unavailable when a main wallet has no balance', async () => {
+  it('shows the main wallet with an unavailable balance when wallet_balance is missing', async () => {
     getMock.mockResolvedValueOnce({
       status: 200,
       data: {
@@ -1025,7 +1130,7 @@ describe('PortalLayout and protected routes', () => {
             wallet_status: 1,
             status: 1,
             wallet_balance: null,
-            balance: null,
+            balance: 999,
             wallet_leverage: 0,
             createdAt: '2026-11-07T00:00:00Z',
             updatedAt: '2026-11-07T00:00:00Z',
@@ -1034,9 +1139,13 @@ describe('PortalLayout and protected routes', () => {
       },
     } as ApiResponse);
     await open('/mt5-wallet');
-    const page = harness.routeNativeElement!.querySelector('app-mt5-wallet')!;
-    await vi.waitFor(() => expect(page.textContent).toContain('No accounts found.'));
-    expect(page.querySelector('article')).toBeNull();
+    const element = harness.routeNativeElement!;
+    const page = element.querySelector('app-mt5-wallet')!;
+    await vi.waitFor(() =>
+      expect(page.querySelector('app-main-wallet')?.textContent).toContain('—'),
+    );
+    expect(element.querySelector('.balance-summary strong')?.textContent?.trim()).toBe('—');
+    expect(page.textContent).not.toContain('No accounts found.');
     expect(page.textContent?.replace(/\s+/g, ' ')).toContain('— USD');
   });
 
@@ -1053,6 +1162,23 @@ describe('PortalLayout and protected routes', () => {
   });
 
   it('opens Dashboard with the shared navbar from / when a session already exists', async () => {
+    getMock.mockResolvedValueOnce({
+      data: {
+        result: true,
+        data: [
+          {
+            wallet_type: 'main',
+            wallet_status: 1,
+            wallet_balance: 1234.5,
+            wallet_credit: 25,
+            balance: 999,
+          },
+          { wallet_type: 'point', wallet_status: 1, wallet_balance: 750, wallet_credit: '125.5' },
+          { wallet_type: 'trading', wallet_status: 1, wallet_balance: 2500 },
+          { wallet_type: 'point', wallet_status: 0, wallet_balance: 600, wallet_credit: 500 },
+        ],
+      },
+    } as ApiResponse);
     await open('/');
     const element = harness.routeNativeElement!;
     expect(TestBed.inject(Router).url).toBe('/dashboard');
@@ -1069,8 +1195,12 @@ describe('PortalLayout and protected routes', () => {
     expect(element.querySelector('.user-email')?.textContent?.trim()).toBe(member.email);
     expect(element.querySelectorAll('.navigation-item:disabled')).toHaveLength(11);
     expect(element.querySelectorAll('nav[aria-label="Sidebar"] a')).toHaveLength(3);
-    expect(element.querySelector('.balance-summary strong')?.textContent?.trim()).toBe('$3,000');
-    expect(getMock).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(element.querySelector('.balance-summary strong')?.textContent?.trim()).toBe('$1,234.50'),
+    );
+    expect(element.querySelector('.user-details .metric-badge')?.textContent?.trim()).toBe('125.5 GP');
+    expect(element.querySelector('app-sidebar svg')).toBeNull();
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
   it.each(protectedUrls.slice(1))(
@@ -1106,8 +1236,8 @@ describe('PortalLayout and protected routes', () => {
     element.querySelector<HTMLAnchorElement>('a[aria-label="Dashboard"]')!.click();
     await harness.fixture.whenStable();
     expect(TestBed.inject(Router).url).toBe('/dashboard');
-    expect(profileGetMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
-    expect(getMock).not.toHaveBeenCalled();
+    expect(profileGetMock.mock.calls).toEqual([['/v1/member/profile'], ['/v1/member/profile']]);
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
   it('checks child routes again when the session has been removed', async () => {
@@ -1115,7 +1245,7 @@ describe('PortalLayout and protected routes', () => {
     sessionStorage.removeItem('authSession');
     await harness.navigateByUrl('/user-info/crypto-wallet', Login);
     expect(TestBed.inject(Router).url).toBe('/');
-    expect(getMock).not.toHaveBeenCalled();
+    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
   });
 
   it('removes private content on logout and blocks subsequent direct visits', async () => {
@@ -1193,6 +1323,8 @@ describe('PortalLayout and protected routes', () => {
     const trigger = element.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')!;
     const dialog = element.querySelector('dialog')!;
     expect(element.querySelector('app-navbar')!.contains(trigger)).toBe(true);
+    expect(trigger.querySelector('img')?.getAttribute('src')).toBe('svg/icon/menu-glass.svg');
+    expect(dialog.querySelector('.toggle-button img')?.getAttribute('src')).toBe('svg/icon/x.svg');
     const focus = vi.spyOn(trigger, 'focus');
     expect(element.querySelector('.desktop-sidebar')).toBeNull();
 
