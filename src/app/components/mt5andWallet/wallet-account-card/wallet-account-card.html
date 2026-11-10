@@ -37,7 +37,10 @@
     </dd>
   </dl>
 
-  <div class="mt-auto grid grid-cols-2 gap-3 pt-4" (click)="$event.stopPropagation()">
+  <div
+    class="mt-auto grid grid-cols-2 gap-3 pt-4 [&_button]:h-full"
+    (click)="$event.stopPropagation()"
+  >
     <app-button
       variant="secondary"
       size="compact"

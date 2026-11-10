@@ -8,6 +8,7 @@ import {
   type WalletMode,
 } from '../../components/mt5andWallet/create-account/create-account';
 import { DepositDemo } from '../../components/mt5andWallet/deposit-demo/deposit-demo';
+import { MainWallet } from '../../components/mt5andWallet/main-wallet/main-wallet';
 import { WalletAccountCard } from '../../components/mt5andWallet/wallet-account-card/wallet-account-card';
 import { WalletAccountTable } from '../../components/mt5andWallet/wallet-account-table/wallet-account-table';
 import { WalletAccounts } from './wallet-accounts';
@@ -19,6 +20,7 @@ import { WalletAccounts } from './wallet-accounts';
     CardWallet,
     CreateAccount,
     DepositDemo,
+    MainWallet,
     TitleCasePipe,
     WalletAccountCard,
     WalletAccountTable,
@@ -50,16 +52,36 @@ export class Mt5Wallet {
   );
   protected readonly walletBalanceLabel = this.walletAccounts.balanceLabel;
 
+  private readonly mainWallet = computed(() => {
+    const accounts = this.walletAccounts.accounts();
+    return (
+      accounts.find((account) => account.isActiveMainWallet) ??
+      accounts.find((account) => account.type === 'main')
+    );
+  });
+  protected readonly visibleMainWallet = computed(() => {
+    const tab = this.activeTab();
+    return tab === null || tab === 'wallet' ? this.mainWallet() : undefined;
+  });
+  protected readonly tableAccounts = computed(() => {
+    const wallet = this.mainWallet();
+    const tradingAccounts = this.accounts().filter(({ type }) => type === 'trading');
+    return wallet && (wallet.status === 0 || wallet.status === 1)
+      ? [wallet, ...tradingAccounts]
+      : tradingAccounts;
+  });
+
   protected readonly tabs = computed(() => {
     const tradingTypes = this.accounts()
       .filter(({ status, type }) => status === 1 && type === 'trading')
       .map(({ tradingType }) => tradingType)
-      .filter((type) => !!type && type !== 'inactive');
-    return [null, ...new Set(tradingTypes), 'inactive'];
+      .filter((type) => !!type && type !== 'wallet' && type !== 'inactive');
+    return [null, ...new Set(tradingTypes), 'wallet', 'inactive'];
   });
 
   protected readonly visibleAccounts = computed(() => {
     const tab = this.activeTab();
+    if (tab === 'wallet') return [];
     return this.accounts().filter(({ status, type, tradingType }) =>
       tab === 'inactive' && type === 'trading'
         ? status === 0

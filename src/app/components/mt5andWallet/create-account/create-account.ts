@@ -1,12 +1,14 @@
 import {
   AfterViewInit,
   Component,
+  computed,
   DestroyRef,
   ElementRef,
   inject,
   input,
   OnDestroy,
   output,
+  resource,
   signal,
   viewChild,
 } from '@angular/core';
@@ -15,6 +17,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Button } from '@components/ui/button/button';
 import { InputComponent } from '@components/ui/input/input';
 import { Checkbox } from '@components/ui/checkbox/checkbox';
+import { getAccountSummary } from '@shared/api/wallet/accountSummary';
 import {
   createWallet,
   type CreateWalletRequest,
@@ -42,6 +45,21 @@ export class CreateAccount implements AfterViewInit, OnDestroy {
   readonly closed = output<boolean>();
   readonly created = output<void>();
   readonly verificationRequired = output<void>();
+
+  // accountSummary to get account limit
+  protected readonly accountSummary = resource({
+    loader: async ({ abortSignal }) => {
+      const response = await getAccountSummary(abortSignal);
+      return response?.result === true ? response.data : undefined;
+    },
+  });
+
+  // accountLimit is the limit of current account
+  protected readonly accountLimit = computed(() => {
+    if (!this.accountSummary.hasValue()) return undefined;
+    const limit = this.accountSummary.value()?.[this.type()];
+    return Number.isFinite(limit?.current) && Number.isFinite(limit?.max) ? limit : undefined;
+  });
 
   protected readonly leverageOptions = signal<readonly number[] | null>(null);
   protected readonly leverageLoadFailed = signal(false);
@@ -83,6 +101,7 @@ export class CreateAccount implements AfterViewInit, OnDestroy {
     this.close();
   }
 
+  // loadLeverages
   protected async loadLeverages(): Promise<void> {
     this.leverageRequest?.abort();
     const { accountType, leverage } = this.form.controls;

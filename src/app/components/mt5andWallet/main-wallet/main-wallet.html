@@ -1,0 +1,62 @@
+@let amount = balance();
+@let balanceLabel =
+  (amount
+    | currency: 'USD' : 'symbol' : (amount !== null && amount % 1 !== 0 ? '1.2-2' : '1.0-0')) ??
+  '—';
+
+<article
+  class="flex cursor-pointer flex-col gap-3 rounded-2xl border border-gray-100 bg-gray-100 bg-cover bg-center p-4 text-gray-900"
+  style="background-image: url('svg/cardWallet/mainWallet.svg')"
+  (click)="detailsOpen.set(true)"
+>
+  <h3>
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      class="flex w-full cursor-pointer items-center justify-between gap-2 rounded text-left text-lg leading-tight font-bold text-[#1C64F2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1C64F2]"
+    >
+      Main Wallet
+      <img src="svg/icon/Vector.svg" alt="" class="mr-2 h-3.5 w-2 rotate-180" />
+    </button>
+  </h3>
+
+  <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+    <div class="flex flex-col items-start gap-1.5">
+      <p class="text-sm text-gray-600">Available Balance</p>
+      <span
+        class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs leading-none"
+      >
+        <img src="svg/icon/chart-mixed.svg" alt="" class="size-3" />
+        20 lots/Day
+      </span>
+    </div>
+    <strong
+      class="min-w-0 text-2xl leading-tight font-bold wrap-anywhere text-[#1C64F2] tabular-nums"
+    >
+      {{ balanceLabel }}
+    </strong>
+  </div>
+
+  <div class="grid grid-cols-2 gap-2">
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      class="flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg px-2 py-2 text-xs font-medium hover:bg-white/50 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
+    >
+      <img src="svg/icon/circle-arrow-down.svg" alt="" class="size-3" />
+      Deposit
+    </button>
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      class="flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg px-2 py-2 text-xs font-medium hover:bg-white/50 focus-visible:outline-2 focus-visible:outline-[#1C64F2]"
+    >
+      <img src="svg/icon/circle-arrow-up.svg" alt="" class="size-3" />
+      Withdraw
+    </button>
+  </div>
+</article>
+
+@if (detailsOpen()) {
+  <app-main-wallet-card [balanceLabel]="balanceLabel" (closed)="detailsOpen.set(false)" />
+}

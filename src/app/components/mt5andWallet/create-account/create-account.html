@@ -11,11 +11,21 @@
       <h2 id="create-wallet-title" class="text-xl leading-tight font-bold">
         {{ type() === 'demo' ? 'Open Demo Account' : 'Open Live Account' }}
       </h2>
-      <span
-        class="mt-2 inline-flex rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900"
-      >
-        Wallet
-      </span>
+      <div class="flex flex-row gap-2">
+        <span
+          class="mt-2 inline-flex rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-900"
+        >
+          {{ type() === 'demo' ? 'Mt5 Demo' : 'Wallet' }}
+        </span>
+        <span
+          class="mt-2 inline-flex rounded-md bg-[#F3F4F6] px-2.5 py-1 text-xs font-medium text-[#848A95]"
+          aria-live="polite"
+        >
+          @let limit = accountLimit();
+          {{ type() === 'demo' ? 'Limit:' : 'Wallet Limit:' }}
+          {{ limit ? limit.current + '/' + limit.max : accountSummary.isLoading() ? '…' : '—' }}
+        </span>
+      </div>
     </div>
     <button
       type="button"
