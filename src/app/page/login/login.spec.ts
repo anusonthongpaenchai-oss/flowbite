@@ -634,7 +634,9 @@ describe('Login', () => {
         expect(selectedStorage.getItem('authSession')).not.toBeNull();
         expect(otherStorage.getItem('authSession')).toBeNull();
         harness
-          .routeNativeElement!.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!
+          .routeNativeElement!.querySelector<HTMLButtonElement>(
+            'app-user-info button[aria-label="Logout"]',
+          )!
           .click();
         await harness.fixture.whenStable();
         const logoutDialog = harness.routeNativeElement!.querySelector<HTMLDialogElement>(
@@ -680,7 +682,9 @@ describe('Login', () => {
       await harness.navigateByUrl('/user-info');
       await harness.fixture.whenStable();
       harness
-        .routeNativeElement!.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!
+        .routeNativeElement!.querySelector<HTMLButtonElement>(
+          'app-user-info button[aria-label="Logout"]',
+        )!
         .click();
       await harness.fixture.whenStable();
       expect(

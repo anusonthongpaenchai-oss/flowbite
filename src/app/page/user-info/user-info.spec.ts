@@ -290,7 +290,7 @@ describe('UserInfo', () => {
     );
     setAuthSession({ ...getAuthSession()!, twoFaEnabled: undefined, rememberDevice: false });
     const element = render();
-    component.openLogoutConfirmation();
+    component.logoutFlow.open();
     fixture.detectChanges();
     const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
     expect(dialog.querySelector('input[type="checkbox"]')).toBeNull();
@@ -350,7 +350,7 @@ describe('UserInfo', () => {
       const router = TestBed.inject(Router);
       const navigate = vi.spyOn(router, 'navigateByUrl');
       const button = harness.routeNativeElement!.querySelector<HTMLButtonElement>(
-        'button[aria-label="Logout"]',
+        'app-user-info button[aria-label="Logout"]',
       )!;
 
       expect(button.querySelector('img')?.getAttribute('src')).toBe('svg/icon/logout-2.svg');
@@ -420,7 +420,7 @@ describe('UserInfo', () => {
       expect(getAuthSession()).toBeNull();
       expect(localStorage.getItem('authSession')).toBeNull();
       expect(sessionStorage.getItem('authSession')).toBeNull();
-      expect(component.isLogoutConfirmationOpen()).toBe(false);
+      expect(component.logoutFlow.isOpen()).toBe(false);
       expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
     },
   );
@@ -460,8 +460,8 @@ describe('UserInfo', () => {
     render();
     await fixture.whenStable();
 
-    await component.handleLogout(false);
-    await component.handleLogout(true);
+    await component.logoutFlow.confirm(false);
+    await component.logoutFlow.confirm(true);
 
     expect(postMock).not.toHaveBeenCalled();
     expect(getAuthSession()).not.toBeNull();
@@ -480,13 +480,13 @@ describe('UserInfo', () => {
       const element = render();
       await fixture.whenStable();
 
-      component.openLogoutConfirmation();
+      component.logoutFlow.open();
       fixture.detectChanges();
-      const request = component.handleLogout(removeRememberedDevices);
+      const request = component.logoutFlow.confirm(removeRememberedDevices);
       fixture.detectChanges();
       const button = element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!;
 
-      expect(component.isLoggingOut()).toBe(true);
+      expect(component.logoutFlow.isLoggingOut()).toBe(true);
       expect(button.disabled).toBe(true);
       expect(button.textContent).toContain('Logging out...');
       const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
@@ -496,11 +496,11 @@ describe('UserInfo', () => {
         ).every((control) => control.disabled),
       ).toBe(true);
       dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
-      component.closeLogoutConfirmation();
+      component.logoutFlow.close();
       expect(dialog.open).toBe(true);
-      expect(component.isLogoutConfirmationOpen()).toBe(true);
+      expect(component.logoutFlow.isOpen()).toBe(true);
       button.click();
-      await component.handleLogout(removeRememberedDevices);
+      await component.logoutFlow.confirm(removeRememberedDevices);
       expect(postMock).toHaveBeenCalledTimes(1);
       expect(getAuthSession()).not.toBeNull();
 
@@ -510,7 +510,7 @@ describe('UserInfo', () => {
       } as ApiResponse);
       await request;
 
-      expect(component.isLoggingOut()).toBe(false);
+      expect(component.logoutFlow.isLoggingOut()).toBe(false);
       expect(getAuthSession()).toBeNull();
     },
   );
@@ -553,7 +553,7 @@ describe('UserInfo', () => {
       await fixture.whenStable();
       const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
 
-      component.openLogoutConfirmation();
+      component.logoutFlow.open();
       fixture.detectChanges();
       const dialog = element.querySelector<HTMLDialogElement>('app-logout-confirmation dialog')!;
       if (removeRememberedDevices) {
@@ -578,15 +578,15 @@ describe('UserInfo', () => {
       expect(
         element.querySelector<HTMLButtonElement>('button[aria-label="Logout"]')!.disabled,
       ).toBe(false);
-      expect(component.isLoggingOut()).toBe(false);
+      expect(component.logoutFlow.isLoggingOut()).toBe(false);
       expect(getAuthSession()).not.toBeNull();
       expect(navigate).not.toHaveBeenCalled();
 
       findButton(dialog, 'Logout').click();
       await fixture.whenStable();
 
-      expect(component.logoutErrorMessage()).toBe('');
-      expect(component.isLogoutConfirmationOpen()).toBe(false);
+      expect(component.logoutFlow.errorMessage()).toBe('');
+      expect(component.logoutFlow.isOpen()).toBe(false);
       expect(getAuthSession()).toBeNull();
       expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
     },

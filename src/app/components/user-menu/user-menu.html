@@ -1,0 +1,85 @@
+<button
+  #trigger
+  type="button"
+  class="grid h-[34px] w-[42px] cursor-pointer place-items-center rounded-sm border-0 bg-white text-black hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0067db]"
+  aria-label="User menu"
+  [attr.aria-expanded]="isOpen()"
+  [attr.aria-controls]="isOpen() ? 'user-menu' : null"
+  (click)="isOpen.set(!isOpen())"
+>
+  <img src="svg/icon/user-outline.svg" class="size-6" alt="" />
+</button>
+
+@if (isOpen()) {
+  @let actionClasses =
+    'flex min-h-11 w-full cursor-pointer items-center gap-3 px-4 py-2 text-left no-underline hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#0067db] disabled:cursor-wait disabled:opacity-60';
+  @let iconClasses = 'size-[18px] shrink-0 mask-contain mask-center mask-no-repeat';
+
+  <div
+    id="user-menu"
+    class="absolute top-full right-0 z-50 mt-1.5 max-h-[calc(100dvh-5rem)] w-[210px] max-w-[calc(100vw-3rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white text-sm text-black shadow-lg"
+  >
+    <div class="flex items-center gap-3 px-3 py-3">
+      @if (avatarUrl() && failedAvatarUrl() !== avatarUrl()) {
+        <img
+          [src]="avatarUrl()"
+          (error)="failedAvatarUrl.set(avatarUrl())"
+          class="size-10 shrink-0 rounded-full object-cover"
+          alt=""
+        />
+      } @else {
+        <span
+          class="grid size-10 shrink-0 place-items-center rounded-full bg-gray-100 font-semibold text-gray-700"
+          aria-hidden="true"
+          >{{ name().charAt(0).toUpperCase() }}</span
+        >
+      }
+      <div class="min-w-0">
+        <p class="truncate leading-5 font-semibold" [title]="name()">{{ name() }}</p>
+        @if (usernameLabel()) {
+          <p class="truncate text-xs leading-4 text-gray-600" [title]="usernameLabel()">
+            {{ usernameLabel() }}
+          </p>
+        }
+      </div>
+    </div>
+
+    <nav class="border-y border-gray-200" aria-label="Account shortcuts">
+      @for (link of links; track link.route) {
+        <a [class]="actionClasses" [routerLink]="link.route" (click)="closeAndRestoreFocus()">
+          <span
+            class="bg-gray-700"
+            [class]="iconClasses"
+            [style.mask-image]="'url(' + link.icon + ')'"
+            aria-hidden="true"
+          ></span>
+          {{ link.label }}
+        </a>
+      }
+      <button type="button" [class]="actionClasses" (click)="requestPasswordChange()">
+        <span
+          class="bg-gray-700 mask-[url(/svg/icon/key-fill.svg)]"
+          [class]="iconClasses"
+          aria-hidden="true"
+        ></span>
+        CHANGE PASSWORD
+      </button>
+    </nav>
+
+    <button
+      type="button"
+      class="text-[#0a136a]"
+      [class]="actionClasses"
+      aria-label="Logout"
+      [disabled]="isLoggingOut()"
+      (click)="closeAndRestoreFocus(); logoutRequested.emit()"
+    >
+      <span
+        class="bg-current mask-[url(/svg/icon/power-glass.svg)]"
+        [class]="iconClasses"
+        aria-hidden="true"
+      ></span>
+      {{ isLoggingOut() ? 'Logging out...' : 'LOGOUT' }}
+    </button>
+  </div>
+}

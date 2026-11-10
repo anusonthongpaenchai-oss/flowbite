@@ -26,8 +26,10 @@ export class Sidebar {
   readonly collapsed = input(false);
   readonly mobile = input(false);
   readonly activePage = input<PortalPage>('dashboard');
+  readonly isLoggingOut = input(false);
   readonly toggleRequested = output<void>();
   readonly navigated = output<void>();
+  readonly logoutRequested = output<void>();
   readonly failedImage = signal('');
 
   readonly fullName = computed(() => {

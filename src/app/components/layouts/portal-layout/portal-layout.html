@@ -13,7 +13,9 @@
         [pointsCredit]="pointsCredit()"
         [collapsed]="collapsed()"
         [activePage]="activePage()"
+        [isLoggingOut]="logoutFlow.isLoggingOut()"
         (toggleRequested)="collapsed.set(!collapsed())"
+        (logoutRequested)="logoutFlow.open()"
       />
     </aside>
   } @else {
@@ -31,8 +33,10 @@
         [pointsCredit]="pointsCredit()"
         [mobile]="true"
         [activePage]="activePage()"
+        [isLoggingOut]="logoutFlow.isLoggingOut()"
         (toggleRequested)="closeDrawer()"
         (navigated)="closeDrawer()"
+        (logoutRequested)="closeDrawer(); logoutFlow.open()"
       />
     </dialog>
   }
@@ -42,7 +46,6 @@
     <app-navbar
       class="portal-navbar shrink-0 [&>header]:border [&>header]:border-[#f0f1f3]"
       [pageTitle]="pageTitle()"
-      [showLanguage]="activePage() === 'account'"
     >
       @if (!desktop()) {
         <button
@@ -77,6 +80,14 @@
           Deposit
         </app-button>
       }
+      @if (session(); as activeSession) {
+        <app-user-menu
+          navbar-user-menu
+          [member]="activeSession.member"
+          [isLoggingOut]="logoutFlow.isLoggingOut()"
+          (logoutRequested)="logoutFlow.open()"
+        />
+      }
     </app-navbar>
     <div class="route-content mt-3 min-h-0 flex-1 lg:mt-4">
       @for (sessionKey of [routeSessionKey()]; track sessionKey) {
@@ -87,6 +98,16 @@
     </div>
   </div>
 </div>
+
+@if (logoutFlow.isOpen()) {
+  <app-logout-confirmation
+    [isLoggingOut]="logoutFlow.isLoggingOut()"
+    [canRemoveRememberedDevices]="logoutFlow.canRemoveRememberedDevices()"
+    [errorMessage]="logoutFlow.errorMessage()"
+    (closed)="logoutFlow.close()"
+    (confirmed)="logoutFlow.confirm($event)"
+  />
+}
 
 @if (walletKycNotice(); as notice) {
   <app-propup-kyc

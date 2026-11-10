@@ -58,13 +58,13 @@
   @if (errorMessage()) {
     <p role="alert" class="mb-2.5 text-red-700">{{ errorMessage() }}</p>
   }
-  @if (isLogoutConfirmationOpen()) {
+  @if (logoutFlow.isOpen()) {
     <app-logout-confirmation
-      [isLoggingOut]="isLoggingOut()"
-      [canRemoveRememberedDevices]="canRemoveRememberedDevices()"
-      [errorMessage]="logoutErrorMessage()"
-      (closed)="closeLogoutConfirmation()"
-      (confirmed)="handleLogout($event)"
+      [isLoggingOut]="logoutFlow.isLoggingOut()"
+      [canRemoveRememberedDevices]="logoutFlow.canRemoveRememberedDevices()"
+      [errorMessage]="logoutFlow.errorMessage()"
+      (closed)="logoutFlow.close()"
+      (confirmed)="logoutFlow.confirm($event)"
     ></app-logout-confirmation>
   }
   @if (updateSuccessMessage()) {
@@ -102,11 +102,11 @@
         type="button"
         class="outline-button logout-button mt-2.5 inline-flex min-h-[22px] cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[0.8em] leading-[1.4] text-[#111928] focus-visible:outline-offset-3 focus-visible:[outline:2px_solid_#1c64f2] disabled:cursor-wait disabled:opacity-[0.6] min-[1000px]:min-h-8 min-[1000px]:px-3 min-[1000px]:py-1.5 [&:hover:not(:disabled)]:border-[#9ca3af] [&:hover:not(:disabled)]:bg-[#f3f4f6] [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:px-2.5 [@media(max-width:600px)]:py-2 [@media(max-width:600px)]:text-[0.85em]"
         aria-label="Logout"
-        [disabled]="isLoggingOut()"
-        (click)="openLogoutConfirmation()"
+        [disabled]="logoutFlow.isLoggingOut()"
+        (click)="logoutFlow.open()"
       >
         <img class="text-sm font-medium" [src]="logoutIcon" alt="" aria-hidden="true" />
-        {{ isLoggingOut() ? 'Logging out...' : 'Logout' }}
+        {{ logoutFlow.isLoggingOut() ? 'Logging out...' : 'Logout' }}
       </button>
     </aside>
 
