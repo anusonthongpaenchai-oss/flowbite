@@ -17,7 +17,6 @@
 
   <div class="flex shrink-0 items-center gap-3 max-[540px]:gap-2">
     <ng-content select="[navbar-actions]" />
-    @if (showLanguage()) {
       <button
         type="button"
         class="inline-flex min-h-[34px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs leading-4 text-[#111928] hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1C64F2]"
@@ -35,6 +34,6 @@
           />
         </svg>
       </button>
-    }
+    <ng-content select="[navbar-user-menu]" />
   </div>
 </header>

@@ -1,5 +1,5 @@
-import { Component, computed, inject, OnInit, PendingTasks, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, computed, effect, inject, OnInit, PendingTasks, signal } from '@angular/core';
+import { Router, type Navigation } from '@angular/router';
 import type { Member } from '../../../shared/api/auth/login';
 import {
   normalizeProfileUpdateRequest,
@@ -13,10 +13,9 @@ import { EditProfile } from '../../components/userAccount/userInfo/edit-profile/
 import { ChangImage } from '../../components/userAccount/userInfo/chang-image/chang-image';
 import { ChangPassword } from '../../components/userAccount/userInfo/chang-password/chang-password';
 import { LogoutConfirmation } from '../../components/userAccount/userInfo/logout-confirmation/logout-confirmation';
+import { LogoutFlow } from '../../components/userAccount/userInfo/logout-confirmation/logout-flow';
 
 // api
-import { logout } from '../../../shared/api/auth/logout';
-import { logoutSessions } from '../../../shared/api/auth/logoutSessions';
 import { getUserInfo } from '../../../shared/api/userInfo/userInfo';
 import {
   clearAuthSession,
@@ -24,8 +23,12 @@ import {
   getRememberedAuthSession,
   setAuthSession,
 } from '../../../shared/guard/auth';
+
+const handledPasswordNavigations = new WeakSet<Navigation>();
+
 @Component({
   imports: [Button, EditProfile, ChangImage, ChangPassword, LogoutConfirmation],
+  providers: [LogoutFlow],
   selector: 'app-user-info',
   host: { class: 'block' },
   templateUrl: './user-info.html',
@@ -40,10 +43,7 @@ export class UserInfo implements OnInit {
 
   readonly isLoading = signal(false);
   readonly errorMessage = signal('');
-  readonly isLoggingOut = signal(false);
-  readonly logoutErrorMessage = signal('');
-  readonly isLogoutConfirmationOpen = signal(false);
-  readonly canRemoveRememberedDevices = signal(false);
+  readonly logoutFlow = inject(LogoutFlow);
 
   public isChangeImageProfile = signal<boolean>(false);
   public isChangePassword = signal<boolean>(false);
@@ -142,6 +142,19 @@ export class UserInfo implements OnInit {
     },
   }));
 
+  constructor() {
+    effect(() => {
+      const navigation = this.router.lastSuccessfulNavigation();
+      if (
+        navigation?.extras.info === 'change-password' &&
+        !handledPasswordNavigations.has(navigation)
+      ) {
+        handledPasswordNavigations.add(navigation);
+        this.isChangePassword.set(true);
+      }
+    });
+  }
+
   public openChangeImageProfile(): void {
     if (this.isLoading() || this.isUpdating() || !this.memberId()) {
       return;
@@ -225,53 +238,6 @@ export class UserInfo implements OnInit {
     this.pendingTasks.run(() => this.loadUserInfo());
   }
 
-  public openLogoutConfirmation(): void {
-    if (this.isLoggingOut()) {
-      return;
-    }
-
-    this.logoutErrorMessage.set('');
-    // Completed 2FA sessions also have require2FA: false; use the saved 2FA status.
-    const session = getAuthSession();
-    this.canRemoveRememberedDevices.set(
-      session?.twoFaEnabled === true && session.rememberDevice === true,
-    );
-    this.isLogoutConfirmationOpen.set(true);
-  }
-
-  public closeLogoutConfirmation(): void {
-    if (!this.isLoggingOut()) {
-      this.isLogoutConfirmationOpen.set(false);
-    }
-  }
-
-  public async handleLogout(removeRememberedDevices: boolean): Promise<void> {
-    if (this.isLoggingOut() || !this.isLogoutConfirmationOpen()) {
-      return;
-    }
-
-    this.isLoggingOut.set(true);
-    this.logoutErrorMessage.set('');
-    const completeTask = this.pendingTasks.add();
-
-    try {
-      if (this.canRemoveRememberedDevices() && removeRememberedDevices) {
-        await logoutSessions();
-      } else {
-        await logout();
-      }
-      this.isLogoutConfirmationOpen.set(false);
-      await this.router.navigateByUrl('/', { replaceUrl: true });
-    } catch (error) {
-      this.logoutErrorMessage.set(
-        error instanceof Error ? error.message : 'Unable to sign out. Please try again.',
-      );
-    } finally {
-      this.isLoggingOut.set(false);
-      completeTask();
-    }
-  }
-
   private async loadUserInfo(): Promise<void> {
     this.isLoading.set(true);
     this.isKyc.set(undefined);
@@ -288,6 +254,8 @@ export class UserInfo implements OnInit {
       this.synchronizeSessionMember(
         {
           id: member.id,
+          ...(member.username === undefined ? {} : { username: member.username }),
+          ...(member.m_username === undefined ? {} : { m_username: member.m_username }),
           m_name: member.m_name,
           m_lastname: member.m_lastname,
           m_image_url: member.m_image_url,
@@ -334,7 +302,6 @@ export class UserInfo implements OnInit {
     if (typeof isTrusted === 'boolean') {
       nextSession.twoFaEnabled = isTrusted || session.twoFaEnabled === true;
       nextSession.rememberDevice = isTrusted;
-      this.canRemoveRememberedDevices.set(isTrusted);
     }
     if (JSON.stringify(nextSession) !== JSON.stringify(session)) {
       setAuthSession(nextSession, getRememberedAuthSession() !== null);

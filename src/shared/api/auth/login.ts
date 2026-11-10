@@ -3,6 +3,7 @@ import { api, type ApiResponse, isApiError } from '../api';
 export interface Member {
   id: number;
   username: string;
+  m_username?: string | number;
   email: string;
   m_phone?: string | null;
   m_image_url?: string;

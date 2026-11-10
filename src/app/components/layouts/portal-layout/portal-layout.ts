@@ -11,16 +11,28 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { Sidebar, type PortalPage } from '../../sidebar/sidebar';
 import { Navbar } from '../../navbar/navbar';
+import { UserMenu } from '../../user-menu/user-menu';
 import { Button } from '../../ui/button/button';
 import { getAuthSession, onAuthSessionChange } from '../../../../shared/guard/auth';
 import { WalletAccounts } from '../../../page/mt5-wallet/wallet-accounts';
 import { checkWalletKyc, type WalletKycNotice } from '../../../../shared/guard/wallet-kyc';
 import { PropupKyc } from '../../propup-kyc/propup-kyc';
+import { LogoutConfirmation } from '../../userAccount/userInfo/logout-confirmation/logout-confirmation';
+import { LogoutFlow } from '../../userAccount/userInfo/logout-confirmation/logout-flow';
 
 @Component({
   selector: 'app-portal-layout',
-  imports: [RouterLink, RouterOutlet, Sidebar, Navbar, Button, PropupKyc],
-  providers: [WalletAccounts],
+  imports: [
+    RouterLink,
+    RouterOutlet,
+    Sidebar,
+    Navbar,
+    UserMenu,
+    Button,
+    PropupKyc,
+    LogoutConfirmation,
+  ],
+  providers: [WalletAccounts, LogoutFlow],
   host: { class: 'block min-h-dvh bg-[#f9fafb] text-[#111928]' },
   templateUrl: './portal-layout.html',
 })
@@ -47,6 +59,7 @@ export class PortalLayout {
   protected readonly walletKycNotice = signal<WalletKycNotice | null>(null);
   protected readonly availableBalance = this.walletAccounts.mainBalance;
   protected readonly pointsCredit = this.walletAccounts.pointsCredit;
+  protected readonly logoutFlow = inject(LogoutFlow);
   readonly activePage = signal(this.pageFor(this.router.url));
   readonly pageTitle = computed(() => {
     const titles: Record<PortalPage, string> = {

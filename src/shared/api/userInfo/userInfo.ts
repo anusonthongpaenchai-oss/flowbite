@@ -4,6 +4,7 @@ import { authGuard } from '../../guard/auth';
 export type MemberData = {
   id: number;
   username: string;
+  m_username?: string | number;
   email: string;
   m_image_url: string;
   m_name: string;

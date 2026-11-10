@@ -123,6 +123,120 @@ describe('PortalLayout and protected routes', () => {
     return layout;
   }
 
+  async function openUserMenu(element = harness.routeNativeElement!) {
+    const trigger = element.querySelector<HTMLButtonElement>(
+      'app-navbar button[aria-label="User menu"]',
+    );
+    expect(trigger).not.toBeNull();
+    trigger!.click();
+    await harness.fixture.whenStable();
+    return trigger!;
+  }
+
+  it('shows the signed-in member in the navbar menu and dismisses it with Escape or an outside click', async () => {
+    const signedInMember = { ...member, m_image_url: '/avatar.png', m_username: '356154' };
+    setAuthSession({ ...session, member: signedInMember });
+    await harness.navigateByUrl('/dashboard', PortalLayout);
+    const element = harness.routeNativeElement!;
+    expect(element.querySelector('#user-menu')).toBeNull();
+
+    const trigger = await openUserMenu(element);
+    const menu = element.querySelector('#user-menu')!;
+    expect(trigger.querySelector('img')?.getAttribute('src')).toBe('svg/icon/user-outline.svg');
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(menu.querySelector('img')?.getAttribute('src')).toBe('/avatar.png');
+    expect(menu.textContent).toContain('Test');
+    expect(menu.textContent).toContain('#356154');
+
+    const link = menu.querySelector('a')!;
+    link.focus();
+    link.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await harness.fixture.whenStable();
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(element.querySelector('#user-menu')).toBeNull();
+
+    await openUserMenu(element);
+    element.querySelector<HTMLElement>('.navbar-title')!.click();
+    await harness.fixture.whenStable();
+    expect(element.querySelector('#user-menu')).toBeNull();
+  });
+
+  it.each([
+    ['USER INFO', '/user-info'],
+    ['KYC VERIFICATION', '/user/verify'],
+    ['BANK ACCOUNT', '/user-info/bank-account'],
+  ])('navigates from the navbar menu item %s to %s', async (label, url) => {
+    await open();
+    const element = harness.routeNativeElement!;
+    await openUserMenu(element);
+    const link = [...element.querySelectorAll<HTMLAnchorElement>('#user-menu a')].find(
+      (anchor) => anchor.textContent?.trim() === label,
+    );
+    expect(link).toBeDefined();
+    link!.click();
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe(url);
+    expect(element.querySelector('#user-menu')).toBeNull();
+    expect(element.querySelector('app-chang-password')).toBeNull();
+  });
+
+  it('opens and reopens the existing password dialog at /user-info from the navbar', async () => {
+    await open();
+    const element = harness.routeNativeElement!;
+    const dialog = () => element.querySelector('app-user-info app-chang-password dialog[open]');
+    expect(dialog()).toBeNull();
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await openUserMenu(element);
+      const action = [...element.querySelectorAll<HTMLButtonElement>('#user-menu button')].find(
+        (button) => button.textContent?.trim() === 'CHANGE PASSWORD',
+      );
+      expect(action).toBeDefined();
+      action!.click();
+      await harness.fixture.whenStable();
+
+      expect(TestBed.inject(Router).url).toBe('/user-info');
+      expect(element.querySelector('#user-menu')).toBeNull();
+      expect(dialog()?.querySelector('form[aria-label="Change password"]')).toBeTruthy();
+      dialog()!.dispatchEvent(new Event('cancel', { cancelable: true }));
+      await harness.fixture.whenStable();
+      expect(dialog()).toBeNull();
+    }
+  });
+
+  it('confirms logout from the navbar with the remembered-device option', async () => {
+    setAuthSession({ ...session, twoFaEnabled: true, rememberDevice: true });
+    const post = vi.spyOn(api, 'post').mockResolvedValue({
+      status: 200,
+      data: { result: true },
+    } as ApiResponse);
+    await harness.navigateByUrl('/dashboard', PortalLayout);
+    const element = harness.routeNativeElement!;
+    await openUserMenu(element);
+    const logout = element.querySelector<HTMLButtonElement>('#user-menu button[aria-label="Logout"]');
+    expect(logout).not.toBeNull();
+    logout!.click();
+    await harness.fixture.whenStable();
+
+    expect(element.querySelector('#user-menu')).toBeNull();
+    expect(post).not.toHaveBeenCalled();
+    const dialog = element.querySelector('app-logout-confirmation dialog[open]');
+    const checkbox = dialog?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(checkbox).toBeTruthy();
+    checkbox!.click();
+    await harness.fixture.whenStable();
+    dialog!.querySelector<HTMLButtonElement>('app-button button')!.click();
+    await harness.fixture.whenStable();
+
+    expect(post).toHaveBeenCalledExactlyOnceWith('/v1/auth/sessions/logout', {}, {
+      validateStatus: expect.any(Function),
+    });
+    expect(getAuthSession()).toBeNull();
+    expect(TestBed.inject(Router).url).toBe('/');
+  });
+
   it.each(protectedUrls)(
     'redirects a direct unauthenticated visit to %s before rendering private content',
     async (url) => {
@@ -1259,6 +1373,56 @@ describe('PortalLayout and protected routes', () => {
     await harness.navigateByUrl('/user-info/crypto-wallet', Login);
     expect(TestBed.inject(Router).url).toBe('/');
     expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/trading');
+  });
+
+  it.each([
+    {
+      desktop: true,
+      remembered: false,
+      endpoint: '/v1/auth/logout',
+      body: { forgetDevice: false },
+    },
+    { desktop: false, remembered: true, endpoint: '/v1/auth/sessions/logout', body: {} },
+  ])('confirms logout from the sidebar with desktop=$desktop', async (scenario) => {
+    Object.assign(media, { matches: scenario.desktop });
+    setAuthSession({ ...session, twoFaEnabled: true, rememberDevice: scenario.remembered });
+    const post = vi.spyOn(api, 'post').mockResolvedValue({
+      status: 200,
+      data: { result: true },
+    } as ApiResponse);
+    await harness.navigateByUrl('/dashboard', PortalLayout);
+    const element = harness.routeNativeElement!;
+
+    if (!scenario.desktop) {
+      element.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]')!.click();
+      await harness.fixture.whenStable();
+    }
+
+    const logout = element.querySelector<HTMLButtonElement>(
+      'app-sidebar button[aria-label="Logout"]',
+    );
+    expect(logout).not.toBeNull();
+    logout!.click();
+    await harness.fixture.whenStable();
+
+    const dialog = element.querySelector<HTMLDialogElement>(
+      'app-logout-confirmation dialog[open]',
+    )!;
+    expect(dialog).toBeTruthy();
+    expect(element.querySelector('#navigation-drawer[open]')).toBeNull();
+    expect(post).not.toHaveBeenCalled();
+    const checkbox = dialog.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(!!checkbox).toBe(scenario.remembered);
+    checkbox?.click();
+    await harness.fixture.whenStable();
+    dialog.querySelector<HTMLButtonElement>('app-button button')!.click();
+    await harness.fixture.whenStable();
+
+    expect(post).toHaveBeenCalledExactlyOnceWith(scenario.endpoint, scenario.body, {
+      validateStatus: expect.any(Function),
+    });
+    expect(getAuthSession()).toBeNull();
+    expect(TestBed.inject(Router).url).toBe('/');
   });
 
   it('removes private content on logout and blocks subsequent direct visits', async () => {
