@@ -250,12 +250,17 @@ describe('Login', () => {
 
   it('checks the profile after sign-in and loads the profile when User Account opens', async () => {
     postMock.mockResolvedValueOnce(successfulResponse());
-    const getMock = vi.spyOn(api, 'get').mockImplementation(async () => {
+    const getMock = vi.spyOn(api, 'get').mockImplementation(async (url) => {
       expect(JSON.parse(sessionStorage.getItem('authSession')!)).toEqual({
         ...sessionData,
         tokenExpiresAt: expect.any(Number),
         rememberDevice: false,
       });
+      if (url === '/v1/verify/kyc') return response({ result: true, data: { kyc_stat: 1 } });
+      if (url === '/v1/auth/sessions/active') return response({ result: true, data: [] });
+      if (url === '/v1/member/referral-link') {
+        return response({ result: true, data: { referralLink: '' } });
+      }
       return response({
         result: true,
         message: 'Profile retrieved.',
@@ -284,7 +289,8 @@ describe('Login', () => {
     await harness.fixture.whenStable();
 
     expect(TestBed.inject(Router).url).toBe('/dashboard');
-    expect(getMock).toHaveBeenCalledExactlyOnceWith('/v1/member/profile');
+    const profileCalls = () => getMock.mock.calls.filter(([url]) => url === '/v1/member/profile');
+    expect(profileCalls()).toHaveLength(1);
     expect(harness.routeNativeElement!.querySelector('app-dashboard')).not.toBeNull();
     expect(harness.routeNativeElement!.querySelector('.navbar-title')?.textContent?.trim()).toBe(
       'Dashboard',
@@ -294,10 +300,7 @@ describe('Login', () => {
       .click();
     await harness.fixture.whenStable();
     expect(TestBed.inject(Router).url).toBe('/user-info');
-    expect(getMock.mock.calls.map(([url]) => url)).toEqual([
-      '/v1/member/profile',
-      '/v1/member/profile',
-    ]);
+    expect(profileCalls()).toHaveLength(2);
     const profilePage = harness.routeDebugElement!.query(By.directive(UserInfo))
       .componentInstance as UserInfo;
     expect(profilePage).toBeInstanceOf(UserInfo);

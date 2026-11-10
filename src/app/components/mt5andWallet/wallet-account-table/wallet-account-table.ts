@@ -11,6 +11,7 @@ import { MainWalletCard } from '../main-wallet-card/main-wallet-card';
 })
 export class WalletAccountTable {
   readonly accounts = input.required<readonly WalletAccount[]>();
+  readonly showSearch = input(true);
   readonly detailsRequested = output<string>();
 
   private readonly pageSize = 10;

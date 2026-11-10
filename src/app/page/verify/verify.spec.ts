@@ -245,13 +245,15 @@ describe('Verify KYC flow', () => {
     [2, 'KYC Rejected'],
     [3, 'KYC Verification'],
   ] as const)(
-    'shows both cards together after loading KYC status %s without a loading message',
+    'shows the four verification cards together after loading KYC status %s',
     async (status, title) => {
       const pending = deferredResponse();
       getMock.mockReturnValueOnce(pending.promise);
       const element = render();
       expect(element.querySelector('app-verify-status')).toBeNull();
       expect(element.querySelector('app-google-auth')).toBeNull();
+      expect(element.querySelector('app-phone-verify')).toBeNull();
+      expect(element.querySelector('app-email-verify')).toBeNull();
       expect(element.textContent).not.toContain('Loading KYC data...');
       expect(component.isVerificationOpen()).toBe(false);
 
@@ -260,8 +262,56 @@ describe('Verify KYC flow', () => {
 
       expect(element.querySelector('app-verify-status h3')?.textContent?.trim()).toBe(title);
       expect(element.querySelector('app-google-auth')).not.toBeNull();
+      expect(
+        element.querySelector('app-google-auth + app-phone-verify + app-email-verify'),
+      ).not.toBeNull();
     },
   );
+
+  it('always shows email as verified without an action', async () => {
+    const element = render();
+    await fixture.whenStable();
+    const email = element.querySelector('app-email-verify');
+
+    expect(email?.textContent ?? '').toContain('Your email is verified and secured.');
+    expect(email?.textContent ?? '').toContain('Already Verify');
+    expect(email?.querySelector('button')).toBeNull();
+  });
+
+  it('uses the latest profile KYC flag to show the phone as secured', async () => {
+    useProfile({ ...profile, data: { ...profile.data, member: { ...member, isKyc: 1 } } });
+    const element = render();
+    await fixture.whenStable();
+    const phone = element.querySelector('app-phone-verify');
+
+    expect(phone?.textContent ?? '').toContain('Your phone number is secured with OTP.');
+    expect(phone?.textContent ?? '').toContain('Already Verify');
+    expect(phone?.querySelector('button')).toBeNull();
+  });
+
+  it('opens the existing KYC preparation dialog from the unverified phone card', async () => {
+    const element = render();
+    await fixture.whenStable();
+    const verify = element.querySelector<HTMLButtonElement>('app-phone-verify button');
+
+    expect(verify?.textContent?.trim()).toBe('Verify');
+    verify!.click();
+    await fixture.whenStable();
+
+    expect(verificationDialog()?.open).toBe(true);
+    expect(verificationDialog()?.textContent).toContain('Things you need to prepare');
+  });
+
+  it('shows Phone Verification Pending without an action when KYC is under review', async () => {
+    getMock.mockResolvedValueOnce(response(kycResponse(0)));
+    const element = render();
+    await fixture.whenStable();
+    const phone = element.querySelector('app-phone-verify');
+
+    expect(phone?.querySelector('h3')?.textContent?.trim()).toBe('Phone Verification Pending');
+    expect(phone?.textContent ?? '').toContain('Your phone verification is under review.');
+    expect(phone?.querySelector('button')).toBeNull();
+  });
 
   it('renders Google Authenticator beside KYC and opens its own preparation dialog', async () => {
     const element = render();
